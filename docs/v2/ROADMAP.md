@@ -346,6 +346,47 @@
 
 ---
 
+## V3 Series: E2E Integration
+
+### V3-1: E2E Minimal Pipeline ✅
+**목표**: 약관 2개로 E2E 파이프라인 연결 - 상담용 Chat 응답까지 생성
+
+**작업 범위**:
+- PDF 약관 → Chunk 변환 (page-based)
+- Pattern-based coverage_code 탐지 (후보 추출)
+- **Canonical 검증 후 coverage_code 주입**
+- V2 Compare Engine 연동 (수정 없이 사용)
+- ExplainView → Chat Response 변환
+- Partial Failure 명시적 표시
+- Source Boundary (약관) 인용
+
+**산출물**:
+- `data/v3_1_sample/README.md` - Sample data structure
+- `tools/ingest_v3_1_sample.py` - PDF ingestion pipeline
+- `chat/__init__.py`, `chat/response_writer.py` - Chat response writer
+- `tools/run_v3_1_e2e.sh` - E2E execution script
+- `tests/test_v3_1_e2e_minimal.py` (27 tests)
+- `docs/v3/V3-1-e2e-minimal.md` - Documentation
+
+**금지사항**:
+- LLM으로 coverage_code 추론 금지
+- Embedding 의미 결정 금지
+- **검증 없는 coverage_code 주입 금지**
+- Partial Failure 은폐 금지
+- "보험료" 언급 금지
+
+**DoD (완료 기준)**:
+- PDF → chunk 변환 구현 ✅
+- Pattern-based coverage_code 탐지 ✅
+- **Canonical 검증 후 주입 ✅**
+- V2 Compare Engine 연동 ✅
+- Chat Response 생성 ✅
+- Partial Failure 표시 ✅
+- Source Boundary 인용 ✅
+- 158 tests 통과 ✅
+
+---
+
 ## 핵심 원칙
 
 > **Embedding은 V2-10 이전에 의미 결정에 사용하지 않는다.**
