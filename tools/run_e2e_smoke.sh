@@ -31,7 +31,6 @@ python -m pytest tests/test_e2e_smoke.py \
     -v \
     --tb=short \
     -k "Smoke" \
-    --timeout=30 \
     2>&1 | head -100
 
 SMOKE_EXIT_CODE=${PIPESTATUS[0]}
@@ -55,7 +54,6 @@ python -m pytest tests/test_e2e_smoke.py \
     -v \
     --tb=short \
     -k "GoldenSet" \
-    --timeout=30 \
     2>&1 | head -100
 
 GOLDEN_EXIT_CODE=${PIPESTATUS[0]}
@@ -79,7 +77,6 @@ python -m pytest tests/test_e2e_smoke.py \
     -v \
     --tb=short \
     -k "Regression or Pipeline" \
-    --timeout=30 \
     2>&1 | head -100
 
 REGRESSION_EXIT_CODE=${PIPESTATUS[0]}

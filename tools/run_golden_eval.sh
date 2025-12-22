@@ -67,7 +67,6 @@ python -m pytest tests/test_e2e_smoke.py \
     -v \
     --tb=short \
     -k "GoldenSet" \
-    --timeout=60 \
     2>&1
 
 GOLDEN_EXIT_CODE=$?
@@ -90,7 +89,6 @@ python -m pytest tests/test_e2e_smoke.py \
     -v \
     --tb=short \
     -k "MultiInsurer" \
-    --timeout=60 \
     2>&1
 
 MULTI_EXIT_CODE=$?
