@@ -1,0 +1,74 @@
+# Condition Compare Engine Input Schema
+# STEP V2-3: Condition & Definition Compare Engine
+#
+# V2-3은 금액 비교를 하지 않는다.
+# 오직 정의·조건·경계만 다룬다.
+
+schema:
+  name: condition_compare_input
+  version: "1.0.0"
+  description: "Condition/Definition Compare Engine 입력 규약"
+
+fields:
+  canonical_coverage_code:
+    type: string
+    description: "신정원 통일코드 (예: A4200_1)"
+    constraints:
+      - not_null
+      - foreign_key: canonical_coverage.coverage_code
+
+  comparison_aspects:
+    type: array
+    items:
+      type: enum
+      values:
+        - subtype_coverage    # 유사암/제자리암/경계성종양 보장 여부
+        - method_condition    # 다빈치/로봇/복강경 등 수술방법 포함 여부
+        - boundary_condition  # 감액/지급률/조건부 보장 문구
+        - definition_scope    # "직접치료", "최초", "전이 포함 여부" 등
+    description: "비교할 측면 목록"
+    constraints:
+      - not_null
+      - min_items: 1
+
+  insurers:
+    type: array
+    items:
+      type: enum
+      values:
+        - SAMSUNG
+        - MERITZ
+        - LOTTE
+        - KB
+        - DB
+        - HANWHA
+        - HEUNGKUK
+        - HYUNDAI
+    description: "비교 대상 보험사 목록"
+    constraints:
+      - not_null
+      - min_items: 1
+
+# 입력 규칙 (절대 규칙)
+input_rules:
+  - name: "canonical_code 필수"
+    rule: "입력은 반드시 canonical_coverage_code로만 이루어진다"
+
+  - name: "자연어 질의 금지"
+    rule: "자연어 질의 입력은 금지된다"
+
+  - name: "coverage_name 문자열 금지"
+    rule: "담보명 문자열 직접 입력 불가"
+
+# 예시 입력
+examples:
+  valid_input:
+    canonical_coverage_code: "A4200_1"
+    comparison_aspects:
+      - subtype_coverage
+      - boundary_condition
+    insurers: ["SAMSUNG", "MERITZ"]
+
+  invalid_input_natural_language:
+    # ❌ 금지 - 자연어 질의
+    query: "삼성이랑 메리츠 유사암 비교해줘"

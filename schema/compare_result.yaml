@@ -1,0 +1,177 @@
+# Compare Engine Result Schema
+# STEP V2-2: Canonical-Driven Compare Engine
+#
+# 보험사별 결과는 반드시 status를 포함해야 한다.
+# 빈 객체 반환은 금지된다.
+
+schema:
+  name: compare_result
+  version: "1.0.0"
+  description: "Compare Engine 출력 규약"
+
+# 보험사별 결과 상태 (3가지만 허용)
+insurer_result_status:
+  success:
+    description: "canonical_code에 대한 authoritative evidence 존재"
+    required_fields:
+      - status: "success"
+      - value: "정량 비교 데이터"
+      - evidence: "근거 문서 정보"
+    example:
+      status: "success"
+      value:
+        amount: 50000000
+        currency: "KRW"
+        unit: "원"
+        max_count: 1
+      evidence:
+        doc_type: "약관"
+        doc_id: "SAMSUNG_CANCER_2024_v1"
+        page: 45
+        excerpt: "암 진단 확정시 5천만원 지급"
+
+  not_covered:
+    description: "해당 보험사에서 이 담보를 제공하지 않음"
+    required_fields:
+      - status: "not_covered"
+      - reason: "coverage_not_found"
+    example:
+      status: "not_covered"
+      reason: "coverage_not_found"
+
+  unknown:
+    description: "canonical은 해석되었으나 authoritative evidence 없음"
+    required_fields:
+      - status: "unknown"
+      - reason: "canonical_resolved_but_no_authoritative_evidence"
+    example:
+      status: "unknown"
+      reason: "canonical_resolved_but_no_authoritative_evidence"
+
+# 전체 Compare 결과 구조
+compare_response:
+  fields:
+    canonical_coverage_code:
+      type: string
+      description: "비교 대상 canonical 코드"
+
+    canonical_coverage_name:
+      type: string
+      description: "신정원 공식 담보명"
+
+    results:
+      type: object
+      description: "보험사별 결과 (key: insurer code)"
+      additionalProperties:
+        oneOf:
+          - $ref: "#/insurer_result_status/success"
+          - $ref: "#/insurer_result_status/not_covered"
+          - $ref: "#/insurer_result_status/unknown"
+
+    summary:
+      type: object
+      description: "비교 요약"
+      properties:
+        total_insurers:
+          type: integer
+        success_count:
+          type: integer
+        not_covered_count:
+          type: integer
+        unknown_count:
+          type: integer
+
+# 불변 규칙
+invariants:
+  - name: "status 필수"
+    rule: "보험사별 결과는 반드시 status 필드를 포함해야 한다"
+
+  - name: "빈 객체 금지"
+    rule: "빈 객체({}) 반환은 금지된다"
+
+  - name: "evidence 없는 값 금지"
+    rule: "success 상태에서는 반드시 evidence가 있어야 한다"
+
+  - name: "partial failure 허용"
+    rule: "일부 보험사 실패 시에도 전체 compare는 실패하지 않는다"
+
+# V2-2 허용 비교 항목 (정량만)
+allowed_comparison_fields:
+  - field: "amount"
+    type: "number"
+    description: "보험금 금액"
+
+  - field: "max_count"
+    type: "integer"
+    description: "지급 횟수"
+
+  - field: "duration_years"
+    type: "integer"
+    description: "보장 기간 (년)"
+
+  - field: "duration_count"
+    type: "integer"
+    description: "보장 횟수"
+
+# V2-2 금지 비교 항목
+forbidden_comparison_fields:
+  - field: "condition_interpretation"
+    description: "조건 해석 (V2-3에서 처리)"
+
+  - field: "subtype_judgment"
+    description: "subtype 판단 (V2-3에서 처리)"
+
+  - field: "better_judgment"
+    description: "'더 유리함' 판단 (금지)"
+
+# 예시 출력
+examples:
+  normal_compare:
+    canonical_coverage_code: "A4200_1"
+    canonical_coverage_name: "암진단비(유사암제외)"
+    results:
+      SAMSUNG:
+        status: "success"
+        value:
+          amount: 50000000
+          currency: "KRW"
+        evidence:
+          doc_type: "약관"
+          doc_id: "SAMSUNG_CANCER_2024"
+          page: 45
+      MERITZ:
+        status: "success"
+        value:
+          amount: 30000000
+          currency: "KRW"
+        evidence:
+          doc_type: "약관"
+          doc_id: "MERITZ_CANCER_2024"
+          page: 32
+    summary:
+      total_insurers: 2
+      success_count: 2
+      not_covered_count: 0
+      unknown_count: 0
+
+  partial_failure:
+    canonical_coverage_code: "A4200_1"
+    canonical_coverage_name: "암진단비(유사암제외)"
+    results:
+      SAMSUNG:
+        status: "success"
+        value:
+          amount: 50000000
+          currency: "KRW"
+        evidence:
+          doc_type: "약관"
+          doc_id: "SAMSUNG_CANCER_2024"
+          page: 45
+      HYUNDAI:
+        status: "not_covered"
+        reason: "coverage_not_found"
+    summary:
+      total_insurers: 2
+      success_count: 1
+      not_covered_count: 1
+      unknown_count: 0

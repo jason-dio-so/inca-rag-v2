@@ -38,32 +38,66 @@
 
 ---
 
-### V2-2: Product / Plan 구조 도입
-**목표**: 보험사-상품-플랜 계층 구조 완성
+### V2-2: Canonical-Driven Compare Engine ✅
+**목표**: Canonical coverage_code 단위 비교 엔진 구현
 
 **작업 범위**:
-- product, product_plan 테이블 활용
-- 플랜별 문서 분리
-- 성별/나이 기반 플랜 자동 선택
+- Compare Engine 입력이 canonical_code로만 이루어짐
+- 보험사별 결과가 동일 조건에서 나란히 비교됨
+- 일부 보험사 실패 시에도 Partial Failure로 비교 유지
+- 근거(evidence) 없는 값은 출력되지 않음
+- V2-2에서는 정량 비교만 허용 (금액, 횟수, 기간)
+
+**산출물**:
+- `schema/compare_input.yaml`
+- `schema/compare_result.yaml`
+- `compare/types.py`
+- `compare/engine.py`
+- `tests/test_compare_engine.py`
+- `docs/v2/SPEC-compare-engine.md`
 
 **금지사항**:
-- 기존 canonical 구조 변경 금지
-- 플랜을 coverage_code 판단에 사용 금지
+- LLM으로 조건 요약 금지
+- LLM으로 누락값 보완 금지
+- Embedding으로 유사 담보 검색 금지
+- 조건 해석, subtype 판단, "더 유리함" 판단 금지 (V2-3에서 처리)
+
+**DoD (완료 기준)**:
+- Compare input이 canonical_code로 고정
+- Partial failure 동작 확인
+- Evidence 없는 값 출력 없음
 
 ---
 
-### V2-3: LLM Controlled Extraction
-**목표**: LLM을 활용한 금액/조건 추출 (controlled)
+### V2-3: Condition & Definition Compare Engine ✅
+**목표**: 동일 canonical coverage에 대해 보험사별 정의/조건을 해석 없이 구조적으로 비교
 
 **작업 범위**:
-- 약관 텍스트에서 보장금액 추출
-- 지급조건/면책사항 추출
-- **human-in-the-loop 검증 필수**
+- 정의(Definition): 담보 의미 정의 문구
+- 조건(Condition): 지급 조건/제한 문구
+- Comparison Aspects: subtype_coverage, method_condition, boundary_condition, definition_scope
+- 문서 원문 그대로 출력 (해석/요약 금지)
+
+**산출물**:
+- `schema/condition_compare_input.yaml`
+- `schema/condition_compare_result.yaml`
+- `compare/condition_types.py`
+- `compare/condition_engine.py`
+- `tests/test_condition_compare_engine.py`
+- `docs/v2/SPEC-condition-compare.md`
 
 **금지사항**:
-- LLM으로 coverage_code 결정 금지
-- 승인 없는 자동 DB 반영 금지
-- LLM 출력을 truth로 취급 금지
+- "포함된다/제외된다" 자동 판단 금지
+- "유리/불리" 판단 금지
+- 타 보험사 정의를 기준으로 보정 금지
+- LLM 생성 문구를 사실처럼 사용 금지
+- Embedding 전면 금지 (유사 문단 탐색에도 불가)
+
+**DoD (완료 기준)**:
+- definition/condition 비교 엔진 구현
+- partial failure 정상 동작
+- evidence 없는 정의 미출력
+- LLM/embedding 의미 결정 개입 없음
 
 ---
 
