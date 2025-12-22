@@ -50,3 +50,4 @@
 - [ADR-000: Canonical 신정원](docs/decisions/ADR-000-canonical-shinjeongwon.md)
 - [ADR-001: LLM Controlled Usage](docs/decisions/ADR-001-llm-controlled-usage.md)
 - [ADR-002: Embedding Non-Authoritative](docs/decisions/ADR-002-embedding-non-authoritative.md)
+# trigger actions
