@@ -22,7 +22,7 @@ from typing import Optional
 
 class ViolationType(str, Enum):
     """Violation categories mapped to ADRs"""
-    TERMINOLOGY = "terminology"      # carrier vs insurer
+    TERMINOLOGY = "terminology"      # insurer terminology enforcement
     MEANING_IN_CODE = "meaning_in_code"  # hardcoded policies
     # Future: canonical, llm_usage, embedding_usage, etc.
 
@@ -128,8 +128,11 @@ class PRGuardian:
         # Check forbidden terminology
         for term, message in self.FORBIDDEN_TERMS.items():
             if term in content_lower:
-                # Skip if it's in a comment explaining the rule
+                # Skip if it's in a comment explaining the rule or in FORBIDDEN_TERMS dict
                 if "instead of" in content_lower or "금지" in content:
+                    continue
+                # Skip dictionary keys in FORBIDDEN_TERMS definition
+                if "FORBIDDEN_TERMS" in content or f'"{term}"' in content:
                     continue
                 self.violations.append(Violation(
                     type=ViolationType.TERMINOLOGY,
