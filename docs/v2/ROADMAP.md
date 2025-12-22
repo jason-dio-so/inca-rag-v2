@@ -208,7 +208,43 @@
 
 ---
 
-### V2-7: Embedding 재도입 (미착수)
+### V2-7: E2E Smoke & Golden Set ✅
+**목표**: E2E 파이프라인 검증 및 회귀 방지 Golden Set 구축
+
+**작업 범위**:
+- E2E Smoke Test Cases (6 시나리오)
+- Golden Set Regression Core (18 케이스)
+- 다보험사 비교 검증
+- Partial Failure 검증
+
+**산출물**:
+- `eval/e2e_smoke_cases.yaml` - Smoke 테스트 케이스
+- `eval/golden_set_v2_7.json` - Golden Set 데이터
+- `tests/test_e2e_smoke.py` - E2E 테스트 (36 tests)
+- `tools/run_e2e_smoke.sh` - Smoke 실행 스크립트
+- `tools/run_golden_eval.sh` - Golden Set 평가 스크립트
+
+**핵심 구현**:
+- Smoke 6 시나리오: 암진단비, 제자리암, 수술비, Query-only, 금액없음, 근거부족
+- Golden Set: 18 케이스 (결정 유형별 3건+)
+- Partial Failure Ratio: 61%
+- 다보험사: 2사/3사 비교 검증
+
+**금지사항**:
+- 테스트 데이터에 실제 약관 내용 포함 금지
+- LLM 기반 테스트 판정 금지
+- 비결정적(non-deterministic) 테스트 금지
+
+**DoD (완료 기준)**:
+- Smoke 6+ 시나리오 PASS ✅
+- Golden Set 18 케이스 PASS ✅
+- 다보험사 비교 검증 ✅
+- Partial Failure 검증 ✅
+- 127 tests 통과 ✅
+
+---
+
+### V2-8: Embedding 재도입 (미착수)
 **목표**: Canonical 고정 후 embedding 기반 검색 강화
 
 **작업 범위**:
@@ -223,8 +259,8 @@
 
 ## 핵심 원칙
 
-> **Embedding은 V2-7 이전에 의미 결정에 사용하지 않는다.**
+> **Embedding은 V2-8 이전에 의미 결정에 사용하지 않는다.**
 
-- V2-0 ~ V2-6: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX
-- V2-7: Embedding은 검색 효율화 목적으로만 사용
+- V2-0 ~ V2-7: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX
+- V2-8: Embedding은 검색 효율화 목적으로만 사용
 - Embedding이 canonical과 충돌 시, canonical 우선
