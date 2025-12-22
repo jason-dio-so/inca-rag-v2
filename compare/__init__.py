@@ -3,6 +3,7 @@
 # V2-3: Condition & Definition Compare Engine
 # V2-4: Evidence Retrieval Refinement
 # V2-5: Evidence-to-Compare Binding
+# V2-6: Explain View / Boundary UX + Slot Rendering
 
 from compare.engine import CompareEngine, serialize_result
 from compare.types import (
@@ -58,6 +59,27 @@ from compare.evidence_binder import (
     bind_evidence,
 )
 
+# V2-6 Explain View Types
+from compare.explain_types import (
+    AmountEvidenceItem,
+    CardType,
+    ConditionEvidenceItem,
+    DefinitionEvidenceItem,
+    DroppedEvidenceInfo,
+    EvidenceReference,
+    EvidenceTabs,
+    ExplainViewResponse,
+    InsurerExplainView,
+    MultiInsurerExplainView,
+    ReasonCard,
+    RuleTrace,
+)
+from compare.explain_view_mapper import (
+    ExplainViewMapper,
+    create_explain_view,
+    create_multi_insurer_explain_view,
+)
+
 __all__ = [
     # Engine
     "CompareEngine",
@@ -104,4 +126,20 @@ __all__ = [
     "BindingContext",
     "EvidenceBinder",
     "bind_evidence",
+    # V2-6 Explain View
+    "AmountEvidenceItem",
+    "CardType",
+    "ConditionEvidenceItem",
+    "DefinitionEvidenceItem",
+    "DroppedEvidenceInfo",
+    "EvidenceReference",
+    "EvidenceTabs",
+    "ExplainViewResponse",
+    "InsurerExplainView",
+    "MultiInsurerExplainView",
+    "ReasonCard",
+    "RuleTrace",
+    "ExplainViewMapper",
+    "create_explain_view",
+    "create_multi_insurer_explain_view",
 ]
