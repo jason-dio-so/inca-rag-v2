@@ -1,0 +1,144 @@
+# E2E Smoke Test Cases
+# STEP V2-7: End-to-End 실상품 다보험사 Smoke
+#
+# 목적: 엔진·결정·설명 전체 파이프라인 E2E 검증
+# 원칙: Smoke는 빠르고 결정적이어야 한다
+
+version: "1.0.0"
+description: "V2-7 E2E Smoke Test Cases"
+
+# 테스트 데이터 기준
+data_contract:
+  insurers:
+    - SAMSUNG
+    - MERITZ
+    - HYUNDAI
+  coverage_types:
+    - 암진단비
+    - 제자리암/경계성종양
+    - 수술비
+    - query-only
+
+# 필수 Smoke 시나리오 (6개)
+smoke_cases:
+
+  # Case 1: 암진단비 비교 (금액)
+  - id: "SMOKE-001"
+    name: "암진단비 금액 비교"
+    description: "동일 canonical_code에 대해 두 보험사의 금액 비교"
+    input:
+      canonical_coverage_code: "A4200_1"
+      insurers:
+        - SAMSUNG
+        - MERITZ
+    expected:
+      decision: "determined"
+      has_amount_tab: true
+      has_rule_trace: true
+      applied_rules_contains:
+        - "amount_primary"
+      reason_card_type: "INFO"
+    assertions:
+      - "decision_status == 'determined'"
+      - "evidence_tabs.amount is not empty"
+      - "rule_trace.applied_rules is not empty"
+
+  # Case 2: 제자리암/경계성종양 (정의·조건)
+  - id: "SMOKE-002"
+    name: "제자리암 정의 비교"
+    description: "제자리암/경계성종양 담보의 정의 및 조건 비교"
+    input:
+      canonical_coverage_code: "A4201_1"  # 유사암진단비(제자리암)
+      insurers:
+        - SAMSUNG
+        - HYUNDAI
+    expected:
+      decision_one_of:
+        - "determined"
+        - "definition_only"
+        - "condition_mismatch"
+      has_definition_or_condition_tab: true
+      has_rule_trace: true
+    assertions:
+      - "decision_status in ['determined', 'definition_only', 'condition_mismatch']"
+      - "evidence_tabs.definition or evidence_tabs.condition is not empty"
+
+  # Case 3: 수술비 방식 기반 질의
+  - id: "SMOKE-003"
+    name: "수술비 조건 비교"
+    description: "수술비 담보에서 수술 방식(다빈치/로봇 등) 조건 비교"
+    input:
+      canonical_coverage_code: "A5100"  # 질병수술비
+      insurers:
+        - SAMSUNG
+        - MERITZ
+    expected:
+      decision_one_of:
+        - "determined"
+        - "condition_mismatch"
+      has_condition_tab_possible: true
+    assertions:
+      - "decision_status in ['determined', 'condition_mismatch']"
+
+  # Case 4: Query-only (coverage_code 자동 생성)
+  - id: "SMOKE-004"
+    name: "Query-only 비교"
+    description: "사용자 질의만으로 coverage_code 추론 후 비교"
+    input:
+      query: "암진단비"
+      insurers:
+        - SAMSUNG
+    expected:
+      decision_one_of:
+        - "determined"
+        - "no_amount"
+      coverage_code_resolved: true
+    assertions:
+      - "canonical_coverage_code is not empty"
+      - "decision_status is not null"
+
+  # Case 5: 금액 없음 케이스
+  - id: "SMOKE-005"
+    name: "금액 근거 없음"
+    description: "PASS 1에서 금액 증거를 찾지 못한 케이스"
+    input:
+      canonical_coverage_code: "A9999_TEST"  # 테스트용 존재하지 않는 코드
+      insurers:
+        - SAMSUNG
+    expected:
+      decision: "no_amount"
+      reason_card_type: "ERROR"
+      has_amount_tab: false
+    assertions:
+      - "decision_status == 'no_amount'"
+      - "reason_cards[0].type == 'ERROR'"
+      - "evidence_tabs.amount is empty"
+
+  # Case 6: 근거 부족 (INSUFFICIENT_EVIDENCE)
+  - id: "SMOKE-006"
+    name: "근거 부족"
+    description: "모든 슬롯이 비어있는 케이스"
+    input:
+      canonical_coverage_code: "A0000_EMPTY"  # 테스트용 빈 코드
+      insurers:
+        - MERITZ
+    expected:
+      decision: "insufficient_evidence"
+      reason_card_type: "ERROR"
+      has_any_evidence: false
+    assertions:
+      - "decision_status == 'insufficient_evidence'"
+      - "reason_cards[0].type == 'ERROR'"
+      - "all evidence_tabs are empty"
+
+# Smoke 판정 기준
+smoke_criteria:
+  decision_status_accurate: true
+  applied_rules_not_empty: true
+  source_boundary_present: true
+
+# 실행 설정
+execution:
+  timeout_per_case_ms: 5000
+  parallel: false
+  fail_fast: true

@@ -1,0 +1,253 @@
+{
+  "version": "2.7.0",
+  "description": "V2-7 Golden Set - Regression Core",
+  "created_at": "2024-12-22",
+  "principles": {
+    "min_cases_per_decision": 3,
+    "partial_failure_ratio": ">=50%",
+    "insurer_balance": "round-robin"
+  },
+  "golden_cases": [
+    {
+      "id": "GOLDEN-001",
+      "category": "determined",
+      "query": "암진단비 5천만원",
+      "insurer": "SAMSUNG",
+      "coverage_code": "A4200_1",
+      "expected": {
+        "decision": "determined",
+        "rules": ["amount_primary", "doc_priority"],
+        "doc_type": "약관",
+        "has_amount": true
+      }
+    },
+    {
+      "id": "GOLDEN-002",
+      "category": "determined",
+      "query": "암진단비 비교",
+      "insurer": "MERITZ",
+      "coverage_code": "A4200_1",
+      "expected": {
+        "decision": "determined",
+        "rules": ["amount_primary"],
+        "doc_type": "약관",
+        "has_amount": true
+      }
+    },
+    {
+      "id": "GOLDEN-003",
+      "category": "determined",
+      "query": "뇌졸중진단비",
+      "insurer": "HYUNDAI",
+      "coverage_code": "A4103",
+      "expected": {
+        "decision": "determined",
+        "rules": ["amount_primary", "doc_priority"],
+        "doc_type": "약관",
+        "has_amount": true
+      }
+    },
+    {
+      "id": "GOLDEN-004",
+      "category": "no_amount",
+      "query": "담보 금액 없음 테스트",
+      "insurer": "SAMSUNG",
+      "coverage_code": "A9999_NO_AMOUNT",
+      "expected": {
+        "decision": "no_amount",
+        "rules": ["pass_1_empty"],
+        "reason_card_type": "ERROR",
+        "has_amount": false
+      }
+    },
+    {
+      "id": "GOLDEN-005",
+      "category": "no_amount",
+      "query": "금액 근거 없음",
+      "insurer": "MERITZ",
+      "coverage_code": "A9998_NO_AMOUNT",
+      "expected": {
+        "decision": "no_amount",
+        "rules": ["pass_1_empty"],
+        "reason_card_type": "ERROR",
+        "has_amount": false
+      }
+    },
+    {
+      "id": "GOLDEN-006",
+      "category": "no_amount",
+      "query": "PASS1 실패 케이스",
+      "insurer": "HYUNDAI",
+      "coverage_code": "A9997_NO_AMOUNT",
+      "expected": {
+        "decision": "no_amount",
+        "rules": ["pass_1_empty"],
+        "reason_card_type": "ERROR",
+        "has_amount": false
+      }
+    },
+    {
+      "id": "GOLDEN-007",
+      "category": "condition_mismatch",
+      "query": "조건 충돌 테스트",
+      "insurer": "SAMSUNG",
+      "coverage_code": "A4200_CONFLICT",
+      "expected": {
+        "decision": "condition_mismatch",
+        "rules": ["amount_primary", "condition_conflict"],
+        "reason_card_type": "WARNING",
+        "has_amount": true,
+        "has_condition": true
+      }
+    },
+    {
+      "id": "GOLDEN-008",
+      "category": "condition_mismatch",
+      "query": "면책 조건 충돌",
+      "insurer": "MERITZ",
+      "coverage_code": "A5100_CONFLICT",
+      "expected": {
+        "decision": "condition_mismatch",
+        "rules": ["condition_conflict"],
+        "reason_card_type": "WARNING",
+        "has_condition": true
+      }
+    },
+    {
+      "id": "GOLDEN-009",
+      "category": "condition_mismatch",
+      "query": "수술비 조건 불일치",
+      "insurer": "HYUNDAI",
+      "coverage_code": "A5100_MISMATCH",
+      "expected": {
+        "decision": "condition_mismatch",
+        "rules": ["condition_conflict"],
+        "reason_card_type": "WARNING"
+      }
+    },
+    {
+      "id": "GOLDEN-010",
+      "category": "definition_only",
+      "query": "정의만 존재",
+      "insurer": "SAMSUNG",
+      "coverage_code": "A4201_DEF_ONLY",
+      "expected": {
+        "decision": "definition_only",
+        "rules": ["definition_only", "definition_no_amount"],
+        "reason_card_type": "INFO",
+        "has_definition": true,
+        "has_amount": false
+      }
+    },
+    {
+      "id": "GOLDEN-011",
+      "category": "definition_only",
+      "query": "제자리암 정의",
+      "insurer": "MERITZ",
+      "coverage_code": "A4201_1_DEF",
+      "expected": {
+        "decision": "definition_only",
+        "rules": ["definition_only"],
+        "reason_card_type": "INFO",
+        "has_definition": true
+      }
+    },
+    {
+      "id": "GOLDEN-012",
+      "category": "definition_only",
+      "query": "경계성종양 정의만",
+      "insurer": "HYUNDAI",
+      "coverage_code": "A4202_DEF",
+      "expected": {
+        "decision": "definition_only",
+        "rules": ["definition_only"],
+        "has_definition": true,
+        "has_amount": false
+      }
+    },
+    {
+      "id": "GOLDEN-013",
+      "category": "insufficient_evidence",
+      "query": "근거 없음",
+      "insurer": "SAMSUNG",
+      "coverage_code": "A0000_EMPTY",
+      "expected": {
+        "decision": "insufficient_evidence",
+        "rules": ["no_evidence"],
+        "reason_card_type": "ERROR",
+        "has_amount": false,
+        "has_condition": false,
+        "has_definition": false
+      }
+    },
+    {
+      "id": "GOLDEN-014",
+      "category": "insufficient_evidence",
+      "query": "빈 슬롯",
+      "insurer": "MERITZ",
+      "coverage_code": "A0001_EMPTY",
+      "expected": {
+        "decision": "insufficient_evidence",
+        "rules": ["no_evidence"],
+        "reason_card_type": "ERROR"
+      }
+    },
+    {
+      "id": "GOLDEN-015",
+      "category": "insufficient_evidence",
+      "query": "판단 불가",
+      "insurer": "HYUNDAI",
+      "coverage_code": "A0002_EMPTY",
+      "expected": {
+        "decision": "insufficient_evidence",
+        "rules": ["no_evidence"],
+        "reason_card_type": "ERROR"
+      }
+    },
+    {
+      "id": "GOLDEN-016",
+      "category": "multi_insurer",
+      "query": "다보험사 암진단비",
+      "insurers": ["SAMSUNG", "MERITZ"],
+      "coverage_code": "A4200_1",
+      "expected": {
+        "insurer_count": 2,
+        "all_have_decision": true
+      }
+    },
+    {
+      "id": "GOLDEN-017",
+      "category": "multi_insurer",
+      "query": "3사 비교",
+      "insurers": ["SAMSUNG", "MERITZ", "HYUNDAI"],
+      "coverage_code": "A4103",
+      "expected": {
+        "insurer_count": 3,
+        "all_have_decision": true
+      }
+    },
+    {
+      "id": "GOLDEN-018",
+      "category": "partial_failure",
+      "query": "부분 실패 케이스",
+      "insurers": ["SAMSUNG", "MERITZ"],
+      "coverage_code": "A4200_PARTIAL",
+      "expected": {
+        "samsung_decision": "determined",
+        "meritz_decision": "no_amount",
+        "partial_failure": true
+      }
+    }
+  ],
+  "statistics": {
+    "total_cases": 18,
+    "determined": 3,
+    "no_amount": 3,
+    "condition_mismatch": 3,
+    "definition_only": 3,
+    "insufficient_evidence": 3,
+    "multi_insurer": 2,
+    "partial_failure": 1,
+    "partial_failure_ratio": "61%"
+  }
+}
