@@ -1,0 +1,147 @@
+# Condition Compare Engine Result Schema
+# STEP V2-3: Condition & Definition Compare Engine
+#
+# V2-3은 판단하지 않는다.
+# 문서에 있는 정의/조건을 그대로 구조화한다.
+
+schema:
+  name: condition_compare_result
+  version: "1.0.0"
+  description: "Condition/Definition Compare Engine 출력 규약"
+
+# 비교 측면별 정의
+aspect_types:
+  subtype_coverage:
+    description: "유사암/제자리암/경계성종양 보장 여부"
+    examples:
+      - "유사암(갑상선암, 기타피부암, 경계성종양, 제자리암)은 이 담보에서 보장하지 않습니다"
+      - "기타피부암 및 갑상선암 제외"
+
+  method_condition:
+    description: "수술방법 포함 여부"
+    examples:
+      - "로봇수술, 복강경수술 포함"
+      - "다빈치 수술은 별도 특약 가입 필요"
+
+  boundary_condition:
+    description: "감액/지급률/조건부 보장"
+    examples:
+      - "계약일로부터 1년 이내 진단 시 50% 감액"
+      - "90일 면책기간 적용"
+
+  definition_scope:
+    description: "정의 범위 (직접치료, 최초, 전이 등)"
+    examples:
+      - "최초 1회에 한하여 지급"
+      - "전이암 포함"
+      - "직접적인 치료를 목적으로"
+
+# 보험사별 결과 상태
+insurer_result_status:
+  success:
+    description: "정의/조건 문구가 authoritative evidence에 존재"
+    required_fields:
+      - status: "success"
+      - definitions: "aspect별 정의/조건 문구"
+      - evidence: "근거 문서 정보"
+
+  unknown:
+    description: "canonical은 해석되었으나 정의/조건 문구 없음"
+    allowed_reasons:
+      - "no_authoritative_definition"
+      - "ambiguous_definition"
+
+  not_covered:
+    description: "해당 담보 자체가 존재하지 않음"
+
+# 전체 응답 구조
+condition_compare_response:
+  fields:
+    canonical_coverage_code:
+      type: string
+
+    canonical_coverage_name:
+      type: string
+
+    comparison_aspects:
+      type: array
+      items:
+        type: string
+
+    results:
+      type: object
+      description: "보험사별 결과 (key: insurer code)"
+
+    summary:
+      type: object
+      properties:
+        total_insurers:
+          type: integer
+        success_count:
+          type: integer
+        unknown_count:
+          type: integer
+        not_covered_count:
+          type: integer
+
+# 불변 규칙
+invariants:
+  - name: "판단 금지"
+    rule: "'보장함/안함', '유리/불리' 판단 금지"
+
+  - name: "원문 유지"
+    rule: "정의/조건 문구는 문서 원문 그대로 (요약 최소화)"
+
+  - name: "evidence 필수"
+    rule: "success 상태에서는 반드시 evidence 필요"
+
+  - name: "해석 금지"
+    rule: "LLM이 정의를 해석하거나 비교 결과를 생성하면 안 됨"
+
+# 예시 출력
+examples:
+  normal_compare:
+    canonical_coverage_code: "A4200_1"
+    canonical_coverage_name: "암진단비(유사암제외)"
+    comparison_aspects: ["subtype_coverage", "boundary_condition"]
+    results:
+      SAMSUNG:
+        status: "success"
+        definitions:
+          subtype_coverage: "유사암(갑상선암, 기타피부암, 경계성종양, 제자리암)은 이 담보에서 보장하지 않습니다"
+          boundary_condition: "계약일로부터 90일 이내 암 진단 시 보장하지 않습니다"
+        evidence:
+          doc_type: "약관"
+          doc_id: "SAMSUNG_CANCER_2024"
+          page: 45
+          excerpt: "제3조 보장내용..."
+      MERITZ:
+        status: "success"
+        definitions:
+          subtype_coverage: "기타피부암, 갑상선암, 제자리암, 경계성종양 제외"
+          boundary_condition: "90일 면책기간 적용"
+        evidence:
+          doc_type: "약관"
+          doc_id: "MERITZ_CANCER_2024"
+          page: 32
+
+  partial_failure:
+    canonical_coverage_code: "A4200_1"
+    results:
+      SAMSUNG:
+        status: "success"
+        definitions:
+          subtype_coverage: "유사암 제외"
+        evidence:
+          doc_type: "약관"
+          doc_id: "SAMSUNG_CANCER_2024"
+      HYUNDAI:
+        status: "unknown"
+        reason: "no_authoritative_definition"
+
+  ambiguous_case:
+    canonical_coverage_code: "A4200_1"
+    results:
+      MERITZ:
+        status: "unknown"
+        reason: "ambiguous_definition"

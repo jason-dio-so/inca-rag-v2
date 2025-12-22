@@ -1,0 +1,148 @@
+name: PR Guardian
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  guardian:
+    name: Constitutional Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run PR Guardian
+        id: guardian
+        continue-on-error: true
+        run: |
+          python tools/pr_guardian.py 2>&1 | tee pr_guardian.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        id: tests
+        continue-on-error: true
+        run: |
+          pytest -q 2>&1 | tee pytest.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Prepare failure comment
+        if: steps.guardian.outputs.exit_code != '0' || steps.tests.outputs.exit_code != '0'
+        id: prepare_comment
+        run: |
+          # Prepare comment body
+          {
+            echo 'COMMENT_BODY<<EOF'
+            echo '<!-- PR_GUARDIAN_AUTOCOMMENT -->'
+            echo ''
+
+            # Guardian failures
+            if [ "${{ steps.guardian.outputs.exit_code }}" != "0" ]; then
+              echo '## ❌ PR Guardian Failed'
+              echo ''
+              echo '### Violations Detected'
+              echo ''
+              echo '```'
+              head -n 80 pr_guardian.log
+              if [ $(wc -l < pr_guardian.log) -gt 80 ]; then
+                echo '...'
+                echo '[Output truncated - see Actions log for full details]'
+              fi
+              echo '```'
+              echo ''
+            fi
+
+            # Test failures
+            if [ "${{ steps.tests.outputs.exit_code }}" != "0" ]; then
+              echo '## ❌ Tests Failed'
+              echo ''
+              echo '```'
+              # First 60 lines + last 40 lines if log is long
+              total_lines=$(wc -l < pytest.log)
+              if [ $total_lines -gt 100 ]; then
+                head -n 60 pytest.log
+                echo '...'
+                echo "[${total_lines} total lines - middle truncated]"
+                echo '...'
+                tail -n 40 pytest.log
+              else
+                cat pytest.log
+              fi
+              echo '```'
+              echo ''
+            fi
+
+            echo '---'
+            echo ''
+            echo '### 📚 References'
+            echo ''
+            echo '- [CLAUDE.md](../blob/main/CLAUDE.md) — Execution Constitution'
+            echo '- [PR_REVIEW_RULES.md](../blob/main/.github/PR_REVIEW_RULES.md) — PR Guardian Rules'
+            echo '- [ADR-000 ~ ADR-003](../tree/main/docs/decisions) — Constitutional ADRs'
+            echo ''
+            echo '---'
+            echo ''
+            echo '🔗 [View full workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: Comment on PR (create or update)
+        if: steps.guardian.outputs.exit_code != '0' || steps.tests.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- PR_GUARDIAN_AUTOCOMMENT -->';
+            const body = `${{ steps.prepare_comment.outputs.COMMENT_BODY }}`;
+
+            // Find existing comment with marker
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+
+            const existingComment = comments.find(c => c.body.includes(marker));
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+              console.log('Updated existing PR Guardian comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: body
+              });
+              console.log('Created new PR Guardian comment');
+            }
+
+      - name: Fail if violations
+        if: steps.guardian.outputs.exit_code != '0' || steps.tests.outputs.exit_code != '0'
+        run: |
+          echo "PR Guardian or tests failed. See PR comment for details."
+          exit 1

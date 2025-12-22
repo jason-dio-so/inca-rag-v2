@@ -1,0 +1,83 @@
+# Compare Engine Input Schema
+# STEP V2-2: Canonical-Driven Compare Engine
+#
+# Compare Engine 입력은 반드시 canonical_coverage_code로만 이루어진다.
+# coverage_name 문자열 입력, alias 직접 입력은 금지된다.
+
+schema:
+  name: compare_input
+  version: "1.0.0"
+  description: "Compare Engine 입력 규약"
+
+fields:
+  canonical_coverage_code:
+    type: string
+    description: "신정원 통일코드 (예: A4200_1)"
+    constraints:
+      - not_null
+      - foreign_key: canonical_coverage.coverage_code
+    validation:
+      - "canonical_coverage 테이블에 존재해야 함"
+      - "coverage_name 문자열 입력 금지"
+      - "alias 직접 입력 금지"
+
+  insurers:
+    type: array
+    items:
+      type: enum
+      values:
+        - SAMSUNG
+        - MERITZ
+        - LOTTE
+        - KB
+        - DB
+        - HANWHA
+        - HEUNGKUK
+        - HYUNDAI
+    description: "비교 대상 보험사 목록"
+    constraints:
+      - not_null
+      - min_items: 1
+      - max_items: 8
+
+  query_context:
+    type: object
+    nullable: true
+    description: "선택적 질의 컨텍스트"
+    properties:
+      optional_slots:
+        type: object
+        nullable: true
+        description: "추가 필터 조건 (향후 확장용)"
+
+# 입력 규칙 (절대 규칙)
+input_rules:
+  - name: "canonical_code 필수"
+    rule: "입력은 반드시 canonical_coverage_code로만 이루어진다"
+
+  - name: "coverage_name 문자열 금지"
+    rule: "coverage_name 문자열 입력은 금지된다"
+
+  - name: "alias 직접 입력 금지"
+    rule: "alias 텍스트를 입력으로 사용할 수 없다"
+
+  - name: "canonical 사전 검증"
+    rule: "canonical_coverage_code가 canonical_coverage에 없으면 hard fail"
+
+# 예시 입력
+examples:
+  valid_input:
+    canonical_coverage_code: "A4200_1"
+    insurers: ["SAMSUNG", "MERITZ"]
+    query_context:
+      optional_slots: {}
+
+  invalid_input_name:
+    # ❌ 금지 - coverage_name 문자열 사용
+    coverage_name: "암진단비(유사암제외)"
+    insurers: ["SAMSUNG", "MERITZ"]
+
+  invalid_input_alias:
+    # ❌ 금지 - alias 직접 사용
+    alias: "암진단비Ⅱ(유사암제외)"
+    insurers: ["SAMSUNG", "MERITZ"]
