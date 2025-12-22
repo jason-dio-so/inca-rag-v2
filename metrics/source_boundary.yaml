@@ -1,0 +1,55 @@
+# Source Boundary Drift Metrics Schema
+# V2-8: Operations Monitoring & Drift Detection
+
+schema_version: "1.0.0"
+description: "Source Boundary (doc_type) distribution tracking"
+
+# Authoritative sources: 약관, 사업방법서
+# Non-authoritative (reference only): 상품요약서, 가입설계서, easy summary
+
+metrics:
+  total_evidence_items: 0
+
+  by_doc_type:
+    yakgwan:
+      description: "약관"
+      count: 0
+      percentage: 0.0
+    saeop:
+      description: "사업방법서"
+      count: 0
+      percentage: 0.0
+    summary:
+      description: "상품요약서"
+      count: 0
+      percentage: 0.0
+    other:
+      description: "기타"
+      count: 0
+      percentage: 0.0
+
+  authoritative_ratio:
+    description: "Authoritative (약관+사업방법서) vs Non-authoritative ratio"
+    authoritative_count: 0
+    non_authoritative_count: 0
+    ratio: 0.0
+
+drift_detection:
+  # Baseline from previous run
+  baseline_yakgwan_percentage: null
+  baseline_saeop_percentage: null
+
+  # Current drift from baseline
+  yakgwan_drift: null
+  saeop_drift: null
+
+thresholds:
+  # If authoritative ratio drops below this, WARNING
+  authoritative_ratio_warning: 0.80
+  authoritative_ratio_error: 0.60
+
+  # If any doc_type drifts by this amount, WARNING
+  drift_percentage_warning: 10.0
+  drift_percentage_error: 20.0
+
+collected_at: null
