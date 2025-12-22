@@ -1,0 +1,15 @@
+# Metrics files are generated at runtime
+# Only schema files should be committed
+
+# Generated metrics (excluded)
+decision_distribution.json
+partial_failure_rate.json
+evidence_quality.json
+source_boundary.json
+golden_diff.json
+ops_summary.json
+golden_baseline.json
+
+# Keep schema templates
+!*_schema.json
+!*_schema.yaml

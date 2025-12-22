@@ -1,0 +1,34 @@
+# Partial Failure Rate Metrics Schema
+# V2-8: Operations Monitoring & Drift Detection
+
+schema_version: "1.0.0"
+description: "Partial Failure Rate tracking"
+
+# Partial Failure = NO_AMOUNT | CONDITION_MISMATCH | DEFINITION_ONLY | INSUFFICIENT_EVIDENCE
+# DETERMINED is NOT a partial failure
+
+metrics:
+  total_cases: 0
+  partial_failure_count: 0
+  partial_failure_rate: 0.0
+
+  # By decision type
+  by_decision:
+    no_amount:
+      count: 0
+      rate: 0.0
+    condition_mismatch:
+      count: 0
+      rate: 0.0
+    definition_only:
+      count: 0
+      rate: 0.0
+    insufficient_evidence:
+      count: 0
+      rate: 0.0
+
+thresholds:
+  warning: 0.50  # 50% partial failure -> WARNING
+  error: 0.70    # 70% partial failure -> ERROR
+
+collected_at: null

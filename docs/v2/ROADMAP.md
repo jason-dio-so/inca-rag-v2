@@ -244,7 +244,56 @@
 
 ---
 
-### V2-8: Embedding 재도입 (미착수)
+### V2-8: Ops Monitoring & Drift Detection ✅
+**목표**: 운영 중 품질 변화 조기 감지 및 Silent Degradation 포착
+
+**작업 범위**:
+- Decision 분포 / Partial Failure 비율 모니터링
+- Evidence 품질 / 출처 드리프트 감지
+- Golden Set 결과 변화 감지
+- CI/Nightly 자동 실행 및 리포트 생성
+
+**산출물**:
+- `metrics/decision_distribution.json` - 결정 분포 메트릭
+- `metrics/partial_failure_rate.json` - Partial Failure 비율
+- `metrics/evidence_quality.json` - Evidence 품질 메트릭
+- `metrics/source_boundary.json` - 출처 분포 메트릭
+- `metrics/golden_diff.json` - Golden Set 드리프트
+- `metrics/ops_summary.json` - 운영 요약
+- `tools/collect_metrics.py` - 메트릭 수집기
+- `tools/detect_golden_drift.py` - 드리프트 감지기
+- `tools/render_ops_report.py` - 리포트 렌더러
+- `.github/workflows/nightly-ops.yml` - Nightly CI
+
+**핵심 구현**:
+- Decision Distribution: 5개 결정 유형별 분포
+- Partial Failure Rate: 임계값 기반 경고 (50% WARNING, 70% ERROR)
+- Evidence Quality: PASS1 성공률, dropped evidence 분포
+- Source Boundary: 권위 문서 비율, 드리프트 감지
+- Golden Drift: 결정 변화, 회귀(regression) 감지
+
+**경고 레벨**:
+- INFO: 정상 범위 (기록만)
+- WARNING: 드리프트 임계 근접 (리뷰 권장)
+- ERROR: 드리프트 임계 초과 (원인 분석 필요)
+
+**금지사항**:
+- Drift 감지를 근거로 자동 규칙 변경 ❌
+- Golden 기대값 자동 수정 ❌
+- LLM 요약으로 리포트 대체 ❌
+- Partial Failure 은폐 ❌
+
+**DoD (완료 기준)**:
+- Decision/Partial Failure 지표 수집 ✅
+- Evidence/Source Drift 감지 ✅
+- Golden Diff 자동 비교 ✅
+- Nightly CI 연동 ✅
+- Ops Report 자동 생성 ✅
+- 127 tests 통과 ✅
+
+---
+
+### V2-9: Embedding 재도입 (미착수)
 **목표**: Canonical 고정 후 embedding 기반 검색 강화
 
 **작업 범위**:
@@ -259,8 +308,8 @@
 
 ## 핵심 원칙
 
-> **Embedding은 V2-8 이전에 의미 결정에 사용하지 않는다.**
+> **Embedding은 V2-9 이전에 의미 결정에 사용하지 않는다.**
 
-- V2-0 ~ V2-7: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX
-- V2-8: Embedding은 검색 효율화 목적으로만 사용
+- V2-0 ~ V2-8: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX + Ops Monitoring
+- V2-9: Embedding은 검색 효율화 목적으로만 사용
 - Embedding이 canonical과 충돌 시, canonical 우선
