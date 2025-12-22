@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INCA RAG V2 - Ops Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --color-ok: #10b981;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            --color-info: #3b82f6;
+            --color-bg: #0f172a;
+            --color-card: #1e293b;
+            --color-text: #f1f5f9;
+            --color-text-muted: #94a3b8;
+            --color-border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        header .timestamp {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+        }
+
+        .status-banner {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-banner.ok {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--color-ok);
+        }
+
+        .status-banner.warning {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid var(--color-warning);
+        }
+
+        .status-banner.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--color-error);
+        }
+
+        .status-icon {
+            font-size: 2rem;
+        }
+
+        .status-text h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-text p {
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-card {
+            background: var(--color-card);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid var(--color-border);
+        }
+
+        .metric-card .label {
+            color: var(--color-text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .metric-card .value.ok { color: var(--color-ok); }
+        .metric-card .value.warning { color: var(--color-warning); }
+        .metric-card .value.error { color: var(--color-error); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--color-card);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+        }
+
+        .chart-card h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--color-text);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        .drift-panel {
+            background: var(--color-card);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+        }
+
+        .drift-panel.has-drift {
+            border-color: var(--color-error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .drift-panel h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .drift-panel.has-drift h3 {
+            color: var(--color-error);
+        }
+
+        .drift-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .drift-stat {
+            text-align: center;
+        }
+
+        .drift-stat .number {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .drift-stat .label {
+            color: var(--color-text-muted);
+            font-size: 0.75rem;
+        }
+
+        .error-state {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--color-error);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .error-state h2 {
+            color: var(--color-error);
+            margin-bottom: 0.5rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        th {
+            color: var(--color-text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge.ok { background: rgba(16, 185, 129, 0.2); color: var(--color-ok); }
+        .badge.warning { background: rgba(245, 158, 11, 0.2); color: var(--color-warning); }
+        .badge.error { background: rgba(239, 68, 68, 0.2); color: var(--color-error); }
+
+        footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--color-border);
+            text-align: center;
+            color: var(--color-text-muted);
+            font-size: 0.75rem;
+        }
+
+        footer a {
+            color: var(--color-info);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>INCA RAG V2 - Ops Dashboard</h1>
+            <span class="timestamp" id="timestamp">Loading...</span>
+        </header>
+
+        <div id="content">
+            <div class="error-state" id="loading">
+                <h2>Loading Dashboard...</h2>
+                <p>Fetching metrics from /metrics directory</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                INCA RAG V2 |
+                <a href="../docs/ops/OPS-V2-8-monitoring.md">Monitoring Docs</a> |
+                <a href="../docs/v2/ROADMAP.md">Roadmap</a>
+            </p>
+            <p>Read-only dashboard. No engine modifications allowed.</p>
+        </footer>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

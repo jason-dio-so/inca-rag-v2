@@ -64,13 +64,16 @@ jobs:
         run: |
           python tools/render_ops_report.py 2>&1 | tee report.log
 
-      - name: Upload Metrics Artifacts
+      - name: Upload Metrics and Dashboard Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ops-metrics-${{ github.run_number }}
+          name: ops-dashboard-${{ github.run_number }}
           path: |
             metrics/*.json
             docs/ops/OPS-REPORT-*.md
+            dashboard/index.html
+            dashboard/dashboard.js
+            dashboard/README.md
 
       - name: Check for Warnings/Errors
         id: check_status
@@ -116,6 +119,8 @@ jobs:
           echo "- Golden Drift: ✅" >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Ops Report" >> $GITHUB_STEP_SUMMARY
+          echo "### Ops Report & Dashboard" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See artifacts for full report." >> $GITHUB_STEP_SUMMARY
+          echo "Download the \`ops-dashboard-*\` artifact to view:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: Open \`dashboard/index.html\` in browser" >> $GITHUB_STEP_SUMMARY
+          echo "- **Report**: See \`docs/ops/OPS-REPORT-*.md\`" >> $GITHUB_STEP_SUMMARY

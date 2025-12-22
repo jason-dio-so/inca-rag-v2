@@ -293,7 +293,47 @@
 
 ---
 
-### V2-9: Embedding 재도입 (미착수)
+### V2-9: Ops Dashboard / Visualization ✅
+**목표**: 운영 지표 시각화 대시보드 - 즉각적 판단 가능한 화면
+
+**작업 범위**:
+- 운영 지표 시각화 대시보드
+- Decision / Partial Failure / Drift 추이
+- Evidence & Source Boundary 분포
+- Golden Drift 요약 패널
+- 로컬 + CI artifact 기반 열람
+
+**산출물**:
+- `dashboard/index.html` - 메인 대시보드 페이지
+- `dashboard/dashboard.js` - Chart.js 시각화 로직
+- `dashboard/README.md` - 사용 문서
+- `docs/ops/OPS-V2-9-dashboard.md` - 대시보드 문서
+- `.github/workflows/nightly-ops.yml` - CI artifact 업로드
+
+**핵심 구현**:
+- Overview Banner: OK/WARNING/ERROR 상태
+- Decision Distribution: 5개 결정 유형 파이차트
+- Partial Failure: 유형별 막대차트
+- Evidence Quality: PASS1/PASS2 성공률
+- Source Boundary: doc_type 분포
+- Golden Drift Panel: 드리프트 시 빨간 카드 강조
+
+**금지사항**:
+- 대시보드에서 수치 재계산 ❌
+- 엔진/Golden 직접 수정 ❌
+- "이상 없음" 자동 판단 문구 생성 ❌
+- LLM 기반 해석 추가 ❌
+
+**DoD (완료 기준)**:
+- 운영 지표 전부 시각화 ✅
+- Drift/Partial Failure 강조 표시 ✅
+- metrics 기반 read-only 보장 ✅
+- 로컬/CI artifact 열람 가능 ✅
+- 127 tests 통과 ✅
+
+---
+
+### V2-10: Embedding 재도입 (미착수)
 **목표**: Canonical 고정 후 embedding 기반 검색 강화
 
 **작업 범위**:
@@ -308,8 +348,8 @@
 
 ## 핵심 원칙
 
-> **Embedding은 V2-9 이전에 의미 결정에 사용하지 않는다.**
+> **Embedding은 V2-10 이전에 의미 결정에 사용하지 않는다.**
 
-- V2-0 ~ V2-8: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX + Ops Monitoring
-- V2-9: Embedding은 검색 효율화 목적으로만 사용
+- V2-0 ~ V2-9: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX + Ops Monitoring + Dashboard
+- V2-10: Embedding은 검색 효율화 목적으로만 사용
 - Embedding이 canonical과 충돌 시, canonical 우선
