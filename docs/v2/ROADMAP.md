@@ -2,7 +2,7 @@
 
 ## 단계 구분
 
-### V2-0: Bootstrap (현재)
+### V2-0: Bootstrap ✅
 **목표**: Repository 구조 및 헌법 문서화
 
 **작업 범위**:
@@ -16,17 +16,25 @@
 
 ---
 
-### V2-1: Ingestion Semantic Fixing
-**목표**: 문서 적재 시 coverage_code 태깅 정확도 향상
+### V2-1: Canonical Coverage Data Layer ✅
+**목표**: 모든 담보 의미의 유일한 출처(Single Source of Truth) 구축
 
 **작업 범위**:
-- coverage_alias 기반 태깅 로직 강화
-- 신정원 canonical 검증 적용
+- canonical_coverage 스키마 정의 (신정원 통일코드 기준)
+- coverage_alias 스키마 정의 (단방향 해석)
+- alias → canonical resolve 경로 명세
+- unresolved canonical 시 hard-fail 정책
+
+**산출물**:
+- `schema/canonical_coverage.yaml`
+- `schema/coverage_alias.yaml`
+- `docs/v2/SPEC-canonical-resolve.md`
 
 **금지사항**:
 - LLM으로 coverage_code 추론 금지
 - Embedding으로 의미 판단 금지
 - 새로운 coverage_code 임의 생성 금지
+- canonical 미해결 시 추측/유추 금지
 
 ---
 

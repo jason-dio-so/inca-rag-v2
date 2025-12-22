@@ -1,0 +1,155 @@
+# Coverage Alias Schema
+# STEP V2-1: 단방향 alias → canonical 해석 구조
+#
+# alias는 canonical을 가리킬 수만 있고, 대체할 수 없다.
+# canonical → alias 역참조는 금지된다.
+
+schema:
+  name: coverage_alias
+  version: "1.0.0"
+  description: "보험사/문서별 담보 표현 → 신정원 canonical 매핑"
+
+fields:
+  alias_id:
+    type: integer
+    primary_key: true
+    auto_increment: true
+
+  alias_text:
+    type: string
+    description: "문서/보험사/질의에서 발견된 표현 (예: 암진단비Ⅱ(유사암제외))"
+    constraints:
+      - not_null
+      - indexed
+
+  alias_text_normalized:
+    type: string
+    description: "정규화된 alias (소문자, 공백 정리)"
+    constraints:
+      - not_null
+      - indexed
+
+  insurer:
+    type: enum
+    values:
+      - SAMSUNG
+      - MERITZ
+      - LOTTE
+      - KB
+      - DB
+      - HANWHA
+      - HEUNGKUK
+      - HYUNDAI
+    description: "보험사 코드"
+    constraints:
+      - not_null
+
+  source_doc:
+    type: enum
+    values:
+      - 약관
+      - 사업방법서
+      - 상품요약서
+      - 가입설계서
+    description: "alias 출처 문서 유형"
+    constraints:
+      - not_null
+
+  canonical_code:
+    type: string
+    description: "FK → canonical_coverage.coverage_code"
+    constraints:
+      - not_null
+      - foreign_key: canonical_coverage.coverage_code
+
+  confidence:
+    type: enum
+    values:
+      - high      # 명확한 1:1 매핑
+      - medium    # 문맥상 확실하나 표현 차이 있음
+      - low       # 추가 검증 필요
+    description: "매핑 신뢰도"
+    default: high
+
+  approved:
+    type: boolean
+    description: "승인 여부 (false면 시스템 미사용)"
+    default: false
+    constraints:
+      - not_null
+
+  approved_by:
+    type: string
+    nullable: true
+    description: "승인자 (human only)"
+
+  approved_at:
+    type: timestamp
+    nullable: true
+    description: "승인 일시"
+
+  created_at:
+    type: timestamp
+    description: "생성 일시"
+    default: now()
+
+# 불변 규칙
+invariants:
+  - name: "단방향 해석"
+    rule: "alias → canonical 방향만 허용, 역참조 금지"
+
+  - name: "approved=false 무시"
+    rule: "approved=false인 alias는 runtime에서 완전히 무시"
+
+  - name: "canonical 필수"
+    rule: "canonical_code가 canonical_coverage에 존재하지 않으면 alias 생성 불가"
+
+  - name: "자동 승인 금지"
+    rule: "LLM 또는 시스템이 자동으로 approved=true 설정 불가"
+
+# 인덱스 정의
+indexes:
+  - name: idx_alias_lookup
+    columns: [alias_text_normalized, insurer]
+    unique: true
+    description: "alias 조회용 복합 인덱스"
+
+  - name: idx_canonical_code
+    columns: [canonical_code]
+    description: "canonical_code FK 인덱스"
+
+  - name: idx_approved
+    columns: [approved]
+    description: "승인된 alias만 필터링"
+
+# 예시 데이터 (참고용)
+examples:
+  - alias_id: 1
+    alias_text: "암진단비Ⅱ(유사암제외)"
+    alias_text_normalized: "암진단비ⅱ(유사암제외)"
+    insurer: "DB"
+    source_doc: "상품요약서"
+    canonical_code: "A4200_1"
+    confidence: "high"
+    approved: true
+    approved_by: "admin"
+
+  - alias_id: 2
+    alias_text: "암진단비(유사암 제외)"
+    alias_text_normalized: "암진단비(유사암 제외)"
+    insurer: "SAMSUNG"
+    source_doc: "가입설계서"
+    canonical_code: "A4200_1"
+    confidence: "high"
+    approved: true
+    approved_by: "admin"
+
+  - alias_id: 3
+    alias_text: "암진단특약"
+    alias_text_normalized: "암진단특약"
+    insurer: "MERITZ"
+    source_doc: "약관"
+    canonical_code: "A4200_1"
+    confidence: "low"
+    approved: false  # 미승인 상태 - runtime에서 무시
+    approved_by: null

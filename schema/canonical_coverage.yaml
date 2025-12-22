@@ -1,0 +1,100 @@
+# Canonical Coverage Master Schema
+# STEP V2-1: Single Source of Truth for Coverage Semantics
+#
+# 이 스키마는 신정원 통일담보코드를 기준으로 한 canonical coverage 정의이다.
+# 모든 alias, ingestion, compare, retrieval은 이 정의에 종속된다.
+
+schema:
+  name: canonical_coverage
+  version: "1.0.0"
+  description: "신정원 통일담보코드 기반 Canonical Coverage Master"
+
+fields:
+  coverage_code:
+    type: string
+    primary_key: true
+    description: "신정원 통일코드 (예: A4200_1)"
+    constraints:
+      - not_null
+      - unique
+      - immutable  # 한 번 정의되면 변경 불가
+
+  coverage_name_ko:
+    type: string
+    description: "신정원 공식 담보명 (예: 암진단비(유사암제외))"
+    constraints:
+      - not_null
+
+  category:
+    type: enum
+    values:
+      - 진단
+      - 수술
+      - 입원
+      - 치료
+      - 사망
+      - 후유장해
+      - 기타
+    description: "담보 분류"
+    constraints:
+      - not_null
+
+  disease_group:
+    type: enum
+    values:
+      - 암
+      - 뇌
+      - 심장
+      - 상해
+      - 질병
+      - 기타
+    description: "질병/상해 계열"
+    constraints:
+      - not_null
+
+  legal_basis:
+    type: enum
+    values:
+      - 약관
+      - 사업방법서
+    description: "법적 정의 근거 문서"
+    default: 약관
+
+  notes:
+    type: string
+    nullable: true
+    description: "법적/해석 주의사항"
+
+# 불변 규칙
+invariants:
+  - name: "coverage_code는 신정원 통일코드 형식을 따른다"
+    rule: "coverage_code는 사람이 읽기 좋게 바꾸거나 재명명하지 않는다"
+
+  - name: "canonical은 유일한 truth이다"
+    rule: "이 테이블에 없는 coverage_code는 시스템에서 무효(invalid)"
+
+  - name: "LLM/embedding 생성 금지"
+    rule: "LLM 또는 embedding으로 coverage_code를 생성하거나 수정할 수 없다"
+
+# 예시 데이터 (참고용)
+examples:
+  - coverage_code: "A4200_1"
+    coverage_name_ko: "암진단비(유사암제외)"
+    category: "진단"
+    disease_group: "암"
+    legal_basis: "약관"
+    notes: "유사암(갑상선암, 기타피부암, 경계성종양, 제자리암)은 제외"
+
+  - coverage_code: "A4103"
+    coverage_name_ko: "뇌졸중진단비"
+    category: "진단"
+    disease_group: "뇌"
+    legal_basis: "약관"
+    notes: null
+
+  - coverage_code: "A5100"
+    coverage_name_ko: "질병수술비"
+    category: "수술"
+    disease_group: "질병"
+    legal_basis: "약관"
+    notes: null
