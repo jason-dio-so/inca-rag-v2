@@ -24,10 +24,11 @@ class Insurer(str, Enum):
 
 
 class ResultStatus(str, Enum):
-    """보험사별 결과 상태 (3가지만 허용)"""
+    """보험사별 결과 상태 (V2-4: 4가지 허용)"""
     SUCCESS = "success"
     NOT_COVERED = "not_covered"
     UNKNOWN = "unknown"
+    NO_AMOUNT_FOUND = "no_amount_found"  # V2-4: Amount evidence 없음
 
 
 class DocType(str, Enum):
@@ -124,19 +125,35 @@ class UnknownResult:
     reason: str = "canonical_resolved_but_no_authoritative_evidence"
 
 
-# Union type for insurer results
-InsurerResult = SuccessResult | NotCoveredResult | UnknownResult
+# --- V2-4: No Amount Found Result ---
+
+@dataclass(frozen=True)
+class NoAmountResult:
+    """
+    Amount evidence 없음 결과 (V2-4).
+
+    규칙:
+    - amount_evidence가 없으면 이 결과 반환
+    - hallucinated 금액 생성 금지
+    """
+    status: Literal[ResultStatus.NO_AMOUNT_FOUND] = ResultStatus.NO_AMOUNT_FOUND
+    reason: str = "no_amount_bearing_evidence"
+
+
+# Union type for insurer results (V2-4: NoAmountResult 추가)
+InsurerResult = SuccessResult | NotCoveredResult | UnknownResult | NoAmountResult
 
 
 # --- Compare Response ---
 
 @dataclass(frozen=True)
 class CompareSummary:
-    """비교 요약"""
+    """비교 요약 (V2-4: no_amount_count 추가)"""
     total_insurers: int
     success_count: int
     not_covered_count: int
     unknown_count: int
+    no_amount_count: int = 0  # V2-4
 
 
 @dataclass
@@ -173,6 +190,10 @@ class CompareResponse:
             1 for r in results.values()
             if isinstance(r, UnknownResult)
         )
+        no_amount_count = sum(
+            1 for r in results.values()
+            if isinstance(r, NoAmountResult)
+        )
 
         return cls(
             canonical_coverage_code=canonical_coverage_code,
@@ -183,6 +204,7 @@ class CompareResponse:
                 success_count=success_count,
                 not_covered_count=not_covered_count,
                 unknown_count=unknown_count,
+                no_amount_count=no_amount_count,
             )
         )
 

@@ -1,13 +1,15 @@
 # Compare Engine Result Schema
 # STEP V2-2: Canonical-Driven Compare Engine
+# Updated for V2-4: Evidence Retrieval Refinement
 #
 # 보험사별 결과는 반드시 status를 포함해야 한다.
 # 빈 객체 반환은 금지된다.
+# V2-4: evidence_slots 및 debug 정보 필수
 
 schema:
   name: compare_result
-  version: "1.0.0"
-  description: "Compare Engine 출력 규약"
+  version: "2.0.0"
+  description: "Compare Engine 출력 규약 (V2-4 evidence slots 포함)"
 
 # 보험사별 결과 상태 (3가지만 허용)
 insurer_result_status:
@@ -16,7 +18,7 @@ insurer_result_status:
     required_fields:
       - status: "success"
       - value: "정량 비교 데이터"
-      - evidence: "근거 문서 정보"
+      - evidence_slots: "목적별 evidence 슬롯 (V2-4)"
     example:
       status: "success"
       value:
@@ -24,11 +26,20 @@ insurer_result_status:
         currency: "KRW"
         unit: "원"
         max_count: 1
-      evidence:
-        doc_type: "약관"
-        doc_id: "SAMSUNG_CANCER_2024_v1"
-        page: 45
-        excerpt: "암 진단 확정시 5천만원 지급"
+      evidence_slots:
+        amount:
+          value: "5천만원"
+          source_doc: "약관"
+          excerpt: "암 진단 확정시 5천만원 지급"
+          page: 45
+        condition:
+          source_doc: "약관"
+          excerpt: "계약일로부터 90일 이내 진단 시 보장하지 않음"
+          page: 46
+      debug:
+        retrieval_pass_1_count: 2
+        retrieval_pass_2_count: 1
+        dropped_evidence: []
 
   not_covered:
     description: "해당 보험사에서 이 담보를 제공하지 않음"
@@ -95,6 +106,16 @@ invariants:
   - name: "partial failure 허용"
     rule: "일부 보험사 실패 시에도 전체 compare는 실패하지 않는다"
 
+  # V2-4 추가 규칙
+  - name: "amount 필수"
+    rule: "amount 없이 비교 결과 생성 금지"
+
+  - name: "evidence 목적 명시"
+    rule: "모든 evidence는 목적(AMOUNT|CONDITION|DEFINITION) 명시 필수"
+
+  - name: "debug 정보 필수"
+    rule: "retrieval debug 정보 반드시 포함"
+
 # V2-2 허용 비교 항목 (정량만)
 allowed_comparison_fields:
   - field: "amount"
@@ -126,7 +147,8 @@ forbidden_comparison_fields:
 
 # 예시 출력
 examples:
-  normal_compare:
+  # V2-4: evidence_slots 포함 예시
+  normal_compare_v2_4:
     canonical_coverage_code: "A4200_1"
     canonical_coverage_name: "암진단비(유사암제외)"
     results:
@@ -135,19 +157,37 @@ examples:
         value:
           amount: 50000000
           currency: "KRW"
-        evidence:
-          doc_type: "약관"
-          doc_id: "SAMSUNG_CANCER_2024"
-          page: 45
+        evidence_slots:
+          amount:
+            value: "5천만원"
+            source_doc: "약관"
+            excerpt: "암 진단 확정시 5천만원 지급"
+            page: 45
+          condition:
+            source_doc: "약관"
+            excerpt: "계약일로부터 90일 이내 진단 시 보장하지 않음"
+            page: 46
+        debug:
+          retrieval_pass_1_count: 2
+          retrieval_pass_2_count: 1
+          dropped_evidence:
+            - reason: "no_amount"
+              excerpt: "자세한 내용은 약관 참조..."
       MERITZ:
         status: "success"
         value:
           amount: 30000000
           currency: "KRW"
-        evidence:
-          doc_type: "약관"
-          doc_id: "MERITZ_CANCER_2024"
-          page: 32
+        evidence_slots:
+          amount:
+            value: "3천만원"
+            source_doc: "약관"
+            excerpt: "암 진단 확정시 3천만원 지급"
+            page: 32
+        debug:
+          retrieval_pass_1_count: 1
+          retrieval_pass_2_count: 0
+          dropped_evidence: []
     summary:
       total_insurers: 2
       success_count: 2
@@ -163,10 +203,16 @@ examples:
         value:
           amount: 50000000
           currency: "KRW"
-        evidence:
-          doc_type: "약관"
-          doc_id: "SAMSUNG_CANCER_2024"
-          page: 45
+        evidence_slots:
+          amount:
+            value: "5천만원"
+            source_doc: "약관"
+            excerpt: "암 진단 확정시 5천만원 지급"
+            page: 45
+        debug:
+          retrieval_pass_1_count: 1
+          retrieval_pass_2_count: 0
+          dropped_evidence: []
       HYUNDAI:
         status: "not_covered"
         reason: "coverage_not_found"
@@ -175,3 +221,24 @@ examples:
       success_count: 1
       not_covered_count: 1
       unknown_count: 0
+
+  # V2-4: no_amount_found 예시
+  no_amount_found:
+    canonical_coverage_code: "A4200_1"
+    canonical_coverage_name: "암진단비(유사암제외)"
+    results:
+      SAMSUNG:
+        status: "no_amount_found"
+        reason: "no_amount_bearing_evidence"
+        debug:
+          retrieval_pass_1_count: 0
+          retrieval_pass_2_count: 0
+          dropped_evidence:
+            - reason: "no_amount"
+              excerpt: "암진단비 관련 조항..."
+    summary:
+      total_insurers: 1
+      success_count: 0
+      not_covered_count: 0
+      unknown_count: 0
+      no_amount_count: 1

@@ -101,7 +101,76 @@
 
 ---
 
-### V2-4: Embedding 재도입
+### V2-4: Evidence Retrieval Refinement ✅
+**목표**: 2-Pass Retrieval 구조로 비교 정확도 개선
+
+**작업 범위**:
+- PASS 1: Amount-centric Retrieval (금액/한도/지급률 우선)
+- PASS 2: Context Completion Retrieval (조건/정의 보완)
+- Evidence 목적 분리: AMOUNT, CONDITION, DEFINITION
+- 강제 탈락 규칙 (DROP rules)
+- Debug 정보 필수 포함
+
+**산출물**:
+- `compare/evidence_types.py`
+- `compare/evidence_retriever.py`
+- `schema/evidence_retrieval.yaml`
+- `tests/test_evidence_retriever.py` (17 tests)
+
+**금지사항**:
+- amount 없이 비교 결과 생성 금지
+- evidence 목적 미표기 금지
+- PASS 2 단독 evidence 사용 금지
+- 문서 출처 없는 요약 금지
+- coverage_code 무시 금지
+- hallucinated 금액 생성 금지
+
+**DoD (완료 기준)**:
+- PASS 1 / PASS 2 구조 구현 ✅
+- amount-bearing evidence 우선 적용 ✅
+- evidence 목적 슬롯 분리 ✅
+- debug.retrieval 정보 노출 ✅
+- 38 tests 통과 ✅
+
+---
+
+### V2-5: Evidence-to-Compare Binding ✅
+**목표**: Evidence 슬롯 → Compare 결과 바인딩 규칙 고정
+
+**작업 범위**:
+- Evidence 슬롯 → Compare 결과 필드 바인딩
+- 결정 규칙 명문화 (tie-breaker 포함)
+- Explanation 구조 정의
+- Partial Failure 사유 표준화
+
+**산출물**:
+- `compare/decision_types.py` - CompareDecision, DecisionRule, CompareExplanation
+- `compare/evidence_binder.py` - EvidenceBinder with binding rules
+- `schema/binding_result.yaml` - Binding 결과 스키마
+- `tests/test_evidence_binder.py` (22 tests)
+
+**핵심 구현**:
+- CompareDecision: DETERMINED, NO_AMOUNT, CONDITION_MISMATCH, DEFINITION_ONLY, INSUFFICIENT_EVIDENCE
+- Amount Binding: 최우선 (약관 > 사업방법서, page ASC)
+- Condition Binding: amount 확정 후, 동일 문서 우선
+- Definition Binding: 금액 변경 불가
+
+**금지사항**:
+- LLM 호출 금지
+- embedding score 사용 금지
+- "가장 그럴듯한" 선택 금지
+- silent fallback 금지
+
+**DoD (완료 기준)**:
+- Evidence → Compare 결과가 규칙으로 고정됨 ✅
+- 모든 BindingResult에 explanation 존재 ✅
+- Partial Failure 상태 명확히 구분됨 ✅
+- LLM/embedding 개입 없음 ✅
+- 60 tests 통과 ✅
+
+---
+
+### V2-6: Embedding 재도입 (미착수)
 **목표**: Canonical 고정 후 embedding 기반 검색 강화
 
 **작업 범위**:
@@ -116,8 +185,8 @@
 
 ## 핵심 원칙
 
-> **Embedding은 V2-4 이전에 의미 결정에 사용하지 않는다.**
+> **Embedding은 V2-6 이전에 의미 결정에 사용하지 않는다.**
 
-- V2-0 ~ V2-3: 의미 결정은 오직 신정원 canonical + coverage_alias
-- V2-4: Embedding은 검색 효율화 목적으로만 사용
+- V2-0 ~ V2-5: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩
+- V2-6: Embedding은 검색 효율화 목적으로만 사용
 - Embedding이 canonical과 충돌 시, canonical 우선
