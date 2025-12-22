@@ -1,0 +1,222 @@
+# Evidence Retrieval Schema
+# STEP V2-4: Evidence Retrieval Refinement
+#
+# 2-Pass Retrieval 구조 정의
+# Amount-bearing evidence 절대 우선
+
+schema:
+  name: evidence_retrieval
+  version: "1.0.0"
+  description: "V2-4 Evidence Retrieval 출력 규약"
+
+# Evidence 목적 (3가지만 허용)
+evidence_purpose:
+  amount:
+    description: "금액, 한도, 지급률, 지급액"
+    required: true
+    priority: 1
+    examples:
+      - "3000만원"
+      - "50%"
+      - "지급액"
+      - "한도"
+
+  condition:
+    description: "지급 조건, 예외, 면책"
+    required: false
+    priority: 2
+    examples:
+      - "면책기간"
+      - "90일 이내"
+      - "제외"
+      - "불보장"
+
+  definition:
+    description: "용어 정의, 질병/수술 범위"
+    required: false
+    priority: 3
+    examples:
+      - "암이라 함은"
+      - "정의"
+      - "범위"
+
+# Evidence Slots 구조 (필수)
+evidence_slots:
+  amount:
+    type: object
+    required: true
+    properties:
+      value:
+        type: string
+        description: "추출된 금액 문자열"
+        example: "3000만원"
+      source_doc:
+        type: string
+        enum: ["약관", "사업방법서"]
+        description: "출처 문서 유형"
+      excerpt:
+        type: string
+        description: "원문 발췌"
+      page:
+        type: integer
+        description: "페이지 번호"
+
+  condition:
+    type: object
+    required: false
+    properties:
+      excerpt:
+        type: string
+      source_doc:
+        type: string
+      page:
+        type: integer
+
+  definition:
+    type: object
+    required: false
+    properties:
+      excerpt:
+        type: string
+      source_doc:
+        type: string
+      page:
+        type: integer
+
+# Debug 정보 (반드시 포함)
+debug:
+  type: object
+  required: true
+  properties:
+    retrieval_pass_1_count:
+      type: integer
+      description: "PASS 1에서 선택된 evidence 수"
+    retrieval_pass_2_count:
+      type: integer
+      description: "PASS 2에서 선택된 evidence 수"
+    dropped_evidence:
+      type: array
+      items:
+        type: object
+        properties:
+          reason:
+            type: string
+            enum:
+              - "no_amount"
+              - "no_content"
+              - "duplicate_text"
+              - "reference_only"
+              - "amount_ignored"
+          excerpt:
+            type: string
+            description: "탈락된 evidence 발췌 (100자 이내)"
+
+# Retrieval Pass 정의
+retrieval_passes:
+  pass_1:
+    name: "Amount-centric Retrieval"
+    goal: "금액/한도/지급률이 명시된 문단 확보"
+    required_conditions:
+      - "숫자 패턴 포함 (₩, %, 만원, 억, 지급액 등)"
+      - "coverage_code 일치"
+    output: "amount_evidence[]"
+    on_failure: "PASS 2로 fallback (단, amount 없음 상태 명시)"
+
+  pass_2:
+    name: "Context Completion Retrieval"
+    goal: "PASS 1 evidence를 해석하는 데 필요한 정의/조건 보완"
+    input: "PASS 1에서 선택된 문단의 핵심 키워드"
+    output:
+      - "condition_evidence[]"
+      - "definition_evidence[]"
+    constraints:
+      - "PASS 2 evidence는 단독 사용 불가"
+      - "반드시 PASS 1 evidence를 보조해야 함"
+
+# 강제 탈락 규칙
+drop_rules:
+  - rule: "담보명만 반복되고 내용 없는 문단"
+    reason: "no_content"
+  - rule: "비교 대상 보험사 간 동일 문구 복붙 문단"
+    reason: "duplicate_text"
+  - rule: "금액 없이 '~에 따른다', '약관 참조'만 있는 문단"
+    reason: "reference_only"
+  - rule: "amount_evidence가 있는데 이를 무시한 정의 문단"
+    reason: "amount_ignored"
+
+# Evidence Scoring 기준 (정렬 규칙)
+scoring_criteria:
+  - name: "amount_presence"
+    priority: 1
+    description: "금액 포함 여부 (가장 높은 우선순위)"
+  - name: "confidence_level"
+    priority: 2
+    description: "약관 > 사업방법서 > 상품요약서 > 기타"
+  - name: "document_priority"
+    priority: 3
+    description: "문서 우선순위"
+  - name: "page_distance"
+    priority: 4
+    description: "관련 문단 간 페이지 거리"
+  - name: "keyword_density"
+    priority: 5
+    description: "키워드 밀도"
+
+# Amount 없음 결과
+no_amount_found_result:
+  status: "no_amount_found"
+  reason: "no_amount_bearing_evidence"
+  constraints:
+    - "hallucinated 금액 생성 금지"
+    - "추정값 생성 금지"
+
+# 예시 출력
+examples:
+  success_with_all_slots:
+    evidence_slots:
+      amount:
+        value: "3000만원"
+        source_doc: "약관"
+        excerpt: "암 진단 확정시 3천만원 지급"
+        page: 12
+      condition:
+        excerpt: "계약일로부터 90일 이내 진단 시 보장하지 않음"
+        source_doc: "약관"
+        page: 13
+      definition:
+        excerpt: "암이라 함은 한국표준질병사인분류에서..."
+        source_doc: "약관"
+        page: 10
+    debug:
+      retrieval_pass_1_count: 2
+      retrieval_pass_2_count: 2
+      dropped_evidence:
+        - reason: "no_amount"
+          excerpt: "자세한 내용은 약관을 참조하시기..."
+
+  no_amount_found:
+    status: "no_amount_found"
+    reason: "no_amount_bearing_evidence"
+    debug:
+      retrieval_pass_1_count: 0
+      retrieval_pass_2_count: 0
+      dropped_evidence:
+        - reason: "no_amount"
+          excerpt: "암진단비 관련 조항..."
+
+# 불변 규칙
+invariants:
+  - name: "amount 필수"
+    rule: "amount 없이 비교 결과 생성 금지"
+
+  - name: "목적 명시 필수"
+    rule: "모든 evidence는 목적(AMOUNT|CONDITION|DEFINITION) 명시 필수"
+
+  - name: "PASS 2 단독 사용 금지"
+    rule: "PASS 2 evidence는 PASS 1 없이 단독 사용 불가"
+
+  - name: "출처 명시 필수"
+    rule: "문서 출처 없는 요약 금지"
+
+  - name: "canonical 우선"
+    rule: "모든 retrieval은 coverage_code 기준"
