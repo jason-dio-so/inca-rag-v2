@@ -1,0 +1,340 @@
+# Explain View Schema
+# STEP V2-6: Explain View / Boundary UX + Slot Rendering
+#
+# 목적: 비교 결과를 오해 없이, 경계(boundary)를 유지한 채, 일관된 구조로 노출
+
+schema:
+  name: explain_view
+  version: "1.0.0"
+  description: "V2-6 Explain View 응답 규약"
+
+# Explain View Response (필수 구조)
+explain_view_response:
+  type: object
+  required:
+    - decision
+    - headline
+    - reason_cards
+    - evidence_tabs
+    - rule_trace
+  properties:
+    decision:
+      type: string
+      enum:
+        - "DETERMINED"
+        - "NO_AMOUNT"
+        - "CONDITION_MISMATCH"
+        - "DEFINITION_ONLY"
+        - "INSUFFICIENT_EVIDENCE"
+      description: "결정 상태"
+
+    headline:
+      type: string
+      description: "결과 요약 키 (사실 기반, 추론 금지)"
+
+    reason_cards:
+      type: array
+      items:
+        $ref: "#/reason_card"
+      description: "이유 카드 목록"
+
+    evidence_tabs:
+      $ref: "#/evidence_tabs"
+      description: "Evidence 슬롯별 탭"
+
+    rule_trace:
+      $ref: "#/rule_trace"
+      description: "적용된 규칙 로그"
+
+# Reason Card (Partial Failure 포함)
+reason_card:
+  type: object
+  required:
+    - type
+    - title
+    - message
+    - decision
+  properties:
+    type:
+      type: string
+      enum: ["INFO", "WARNING", "ERROR"]
+      description: "카드 유형"
+    title:
+      type: string
+      description: "카드 제목"
+    message:
+      type: string
+      description: "사실 기반 메시지 (추론 금지)"
+    decision:
+      type: string
+      description: "관련 decision_status"
+    references:
+      type: array
+      items:
+        type: object
+        properties:
+          doc_type:
+            type: string
+          doc_id:
+            type: string
+          page:
+            type: integer
+
+# Decision별 카드 규칙
+decision_card_rules:
+  DETERMINED:
+    type: "INFO"
+    required: true
+    description: "결정 규칙 요약"
+  NO_AMOUNT:
+    type: "ERROR"
+    required: true
+    description: "금액 근거 없음"
+  CONDITION_MISMATCH:
+    type: "WARNING"
+    required: true
+    description: "조건 충돌"
+  DEFINITION_ONLY:
+    type: "INFO"
+    required: true
+    description: "정의만 존재"
+  INSUFFICIENT_EVIDENCE:
+    type: "ERROR"
+    required: true
+    description: "판단 불가"
+
+# Evidence Tabs
+evidence_tabs:
+  type: object
+  properties:
+    amount:
+      type: array
+      items:
+        $ref: "#/amount_evidence_item"
+      description: "금액 증거 (슬롯별 분리)"
+    condition:
+      type: array
+      items:
+        $ref: "#/condition_evidence_item"
+      description: "조건 증거"
+    definition:
+      type: array
+      items:
+        $ref: "#/definition_evidence_item"
+      description: "정의 증거"
+
+amount_evidence_item:
+  type: object
+  required:
+    - value
+    - source_doc
+    - page
+    - excerpt
+  properties:
+    value:
+      type: string
+      description: "금액 값"
+    source_doc:
+      type: string
+      description: "출처 문서 유형"
+    doc_id:
+      type: string
+      description: "문서 ID"
+    page:
+      type: integer
+      description: "페이지 번호"
+    excerpt:
+      type: string
+      description: "발췌 원문"
+
+condition_evidence_item:
+  type: object
+  required:
+    - source_doc
+    - excerpt
+  properties:
+    summary:
+      type: string
+      description: "조건 요약"
+    has_conflict:
+      type: boolean
+      description: "충돌 여부"
+    source_doc:
+      type: string
+      description: "출처 문서"
+    doc_id:
+      type: string
+    page:
+      type: integer
+    excerpt:
+      type: string
+
+definition_evidence_item:
+  type: object
+  required:
+    - source_doc
+    - excerpt
+  properties:
+    term:
+      type: string
+      description: "용어"
+    definition:
+      type: string
+      description: "정의 내용"
+    scope:
+      type: string
+      description: "적용 범위"
+    source_doc:
+      type: string
+    doc_id:
+      type: string
+    page:
+      type: integer
+    excerpt:
+      type: string
+
+# Rule Trace
+rule_trace:
+  type: object
+  required:
+    - applied_rules
+  properties:
+    applied_rules:
+      type: array
+      items:
+        type: string
+      description: "적용된 규칙 (이름 그대로 노출)"
+    dropped_evidence:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          reason:
+            type: string
+      description: "탈락된 증거"
+
+# Slot Rendering 규칙
+slot_rendering_rules:
+  amount:
+    required_fields:
+      - value
+      - source_doc
+      - page
+      - excerpt
+    description: "금액 슬롯 필수 필드"
+  condition:
+    required_fields:
+      - source_doc
+      - excerpt
+    optional_fields:
+      - has_conflict
+    description: "조건 슬롯 필드"
+  definition:
+    required_fields:
+      - source_doc
+      - excerpt
+    optional_fields:
+      - term
+      - scope
+    description: "정의 슬롯 필드"
+
+# 금지 사항
+forbidden:
+  - "슬롯 간 내용 혼합"
+  - "금액 슬롯에 정의 문단 표시"
+  - "출처 없는 발췌"
+  - "설명 문장 생성(LLM)"
+  - "decision_status 변조"
+  - "evidence 생략"
+  - "'사용자 친화적' 추론 추가"
+
+# 예시 출력
+examples:
+  determined:
+    decision: "DETERMINED"
+    headline: "암진단비 비교 결과"
+    reason_cards:
+      - type: "INFO"
+        title: "결과 확정"
+        message: "약관 근거에서 금액이 확인되었습니다"
+        decision: "DETERMINED"
+        references:
+          - doc_type: "약관"
+            doc_id: "SAMSUNG_CANCER_2024"
+            page: 45
+    evidence_tabs:
+      amount:
+        - value: "5천만원"
+          source_doc: "약관"
+          doc_id: "SAMSUNG_CANCER_2024"
+          page: 45
+          excerpt: "암 진단 확정시 5천만원 지급"
+      condition:
+        - source_doc: "약관"
+          excerpt: "계약일로부터 90일 이내 진단 시 보장하지 않음"
+          has_conflict: false
+          page: 46
+    rule_trace:
+      applied_rules:
+        - "RULE_AMOUNT_PRIMARY"
+        - "RULE_DOC_PRIORITY"
+      dropped_evidence: []
+
+  no_amount:
+    decision: "NO_AMOUNT"
+    headline: "금액 근거 없음"
+    reason_cards:
+      - type: "ERROR"
+        title: "금액 근거 부족"
+        message: "약관 및 사업방법서에서 지급 금액이 명시된 근거를 찾지 못했습니다"
+        decision: "NO_AMOUNT"
+    evidence_tabs: {}
+    rule_trace:
+      applied_rules:
+        - "RULE_PASS_1_EMPTY"
+      dropped_evidence:
+        - id: "EVID-001"
+          reason: "NO_AMOUNT"
+
+  condition_mismatch:
+    decision: "CONDITION_MISMATCH"
+    headline: "조건 충돌 감지"
+    reason_cards:
+      - type: "WARNING"
+        title: "조건 충돌"
+        message: "금액은 확인되었으나 적용 조건 간 충돌이 감지되었습니다"
+        decision: "CONDITION_MISMATCH"
+    evidence_tabs:
+      amount:
+        - value: "3천만원"
+          source_doc: "약관"
+          page: 45
+          excerpt: "암 진단 확정시 3천만원 지급"
+      condition:
+        - source_doc: "약관"
+          excerpt: "해당 조건 적용 시 보장 제외"
+          has_conflict: true
+          page: 47
+    rule_trace:
+      applied_rules:
+        - "RULE_AMOUNT_PRIMARY"
+        - "RULE_CONDITION_CONFLICT"
+
+# 불변 규칙
+invariants:
+  - name: "Boundary 유지"
+    rule: "사실(evidence), 규칙(rule), 결론(decision)을 시각적으로 분리"
+
+  - name: "출처 표시 필수"
+    rule: "문서/페이지/발췌(source boundary)를 항상 함께 표시"
+
+  - name: "Partial Failure 노출"
+    rule: "'없음/불가'는 빈칸이 아니라 사유 카드로 표시"
+
+  - name: "규칙 로그 그대로"
+    rule: "규칙은 요약하지 않고 실행된 규칙 이름 그대로 노출"
+
+  - name: "슬롯 분리"
+    rule: "Amount, Condition, Definition 슬롯은 혼합하지 않음"

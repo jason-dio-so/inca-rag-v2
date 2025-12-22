@@ -170,7 +170,45 @@
 
 ---
 
-### V2-6: Embedding 재도입 (미착수)
+### V2-6: Explain View / Boundary UX + Slot Rendering ✅
+**목표**: 비교 결과를 오해 없이, 경계(boundary)를 유지한 채, 일관된 구조로 노출
+
+**작업 범위**:
+- API 응답 스키마 확정
+- Explain View 전용 응답 모델
+- Evidence Slot 렌더링 규칙
+- Partial Failure 카드 표준화
+- 단일/다보험사 공통 레이아웃
+
+**산출물**:
+- `schema/explain_view.yaml` - Explain View 스키마
+- `compare/explain_types.py` - ExplainViewResponse, ReasonCard, EvidenceTabs 등
+- `compare/explain_view_mapper.py` - BindingResult → ExplainView 매퍼
+- `tests/test_explain_view.py` (31 tests)
+
+**핵심 구현**:
+- Decision별 Reason Card: DETERMINED→INFO, NO_AMOUNT→ERROR, CONDITION_MISMATCH→WARNING
+- Evidence Tabs: Amount, Condition, Definition 분리
+- Rule Trace: 적용된 규칙 이름 그대로 노출
+- Boundary UX: 사실/규칙/결론 시각적 분리
+
+**금지사항**:
+- 설명 문장 생성(LLM) 금지
+- decision_status 변조 금지
+- evidence 생략 금지
+- "사용자 친화적" 추론 추가 금지
+
+**DoD (완료 기준)**:
+- Explain View 스키마 정의 ✅
+- decision_status → Reason Card 매핑 ✅
+- Evidence Slot 탭 렌더링 규칙 고정 ✅
+- Rule Trace 노출 ✅
+- Partial Failure 명확 표시 ✅
+- 91 tests 통과 ✅
+
+---
+
+### V2-7: Embedding 재도입 (미착수)
 **목표**: Canonical 고정 후 embedding 기반 검색 강화
 
 **작업 범위**:
@@ -185,8 +223,8 @@
 
 ## 핵심 원칙
 
-> **Embedding은 V2-6 이전에 의미 결정에 사용하지 않는다.**
+> **Embedding은 V2-7 이전에 의미 결정에 사용하지 않는다.**
 
-- V2-0 ~ V2-5: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩
-- V2-6: Embedding은 검색 효율화 목적으로만 사용
+- V2-0 ~ V2-6: 의미 결정은 오직 신정원 canonical + coverage_alias + 규칙 기반 바인딩 + Boundary UX
+- V2-7: Embedding은 검색 효율화 목적으로만 사용
 - Embedding이 canonical과 충돌 시, canonical 우선
