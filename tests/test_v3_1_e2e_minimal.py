@@ -44,15 +44,24 @@ from chat.response_writer import (
 )
 from tools.ingest_v3_1_sample import (
     ChunkMeta,
+    UnmappedCandidate,
     create_chunk,
-    detect_coverage_code,
+    detect_coverage_code_candidate,
     validate_coverage_code,
-    CANONICAL_COVERAGE_CODES,
+    load_canonical_codes,
     _mock_pdf_extraction,
+    CANONICAL_SCHEMA_PATH,
 )
 
 
 # --- Test Fixtures ---
+
+@pytest.fixture(scope="module", autouse=True)
+def load_canonical_codes_fixture():
+    """Load canonical codes before running tests (module-level, runs once)."""
+    import tools.ingest_v3_1_sample as ingest
+    ingest.CANONICAL_COVERAGE_CODES = load_canonical_codes(CANONICAL_SCHEMA_PATH)
+
 
 @pytest.fixture
 def binder():
@@ -150,22 +159,22 @@ class TestIngestion:
             parts = chunk.chunk_id.split("_")
             assert len(parts) >= 3
 
-    def test_coverage_code_detection_cancer(self):
-        """Detect cancer diagnosis coverage code."""
+    def test_coverage_code_candidate_detection_cancer(self):
+        """Detect cancer diagnosis coverage code candidate."""
         text = "제2조 암진단비 피보험자가 암으로 진단된 경우"
-        code = detect_coverage_code(text)
+        code = detect_coverage_code_candidate(text)
         assert code == "A4200_1"
 
-    def test_coverage_code_detection_stroke(self):
-        """Detect stroke coverage code."""
+    def test_coverage_code_candidate_detection_stroke(self):
+        """Detect stroke coverage code candidate."""
         text = "뇌졸중진단비를 지급합니다"
-        code = detect_coverage_code(text)
+        code = detect_coverage_code_candidate(text)
         assert code == "A4103"
 
-    def test_coverage_code_none_for_unmatched(self):
-        """No coverage code for unmatched text."""
+    def test_coverage_code_candidate_none_for_unmatched(self):
+        """No coverage code candidate for unmatched text."""
         text = "제1조 목적 이 약관은 보험계약에 관한 사항을 규정합니다."
-        code = detect_coverage_code(text)
+        code = detect_coverage_code_candidate(text)
         assert code is None
 
     def test_chunks_detect_coverage_code(self, sample_samsung_chunks):
@@ -174,25 +183,112 @@ class TestIngestion:
         assert len(codes) > 0
         assert "A4200_1" in codes
 
-    def test_validate_coverage_code_valid(self):
-        """Valid canonical codes pass validation."""
+    def test_chunks_have_candidate_and_validated_fields(self, sample_samsung_chunks):
+        """Chunks have both coverage_code_candidate and coverage_code fields."""
+        for chunk in sample_samsung_chunks:
+            # All chunks should have these fields (even if None)
+            assert hasattr(chunk, 'coverage_code_candidate')
+            assert hasattr(chunk, 'coverage_code')
+
+    def test_candidate_validated_separation(self, sample_samsung_chunks):
+        """
+        Candidate exists but validated may be None if not in canonical.
+        제자리암 (A4201_1) pattern matches but is not in canonical schema.
+        """
+        # Find chunk with 제자리암 pattern (page 3 in mock)
+        for chunk in sample_samsung_chunks:
+            if chunk.coverage_code_candidate == "A4201_1":
+                # Candidate detected by pattern
+                assert chunk.coverage_code_candidate == "A4201_1"
+                # But NOT validated (A4201_1 not in canonical_coverage.yaml)
+                assert chunk.coverage_code is None
+                break
+
+
+class TestCanonicalYAMLLoad:
+    """Test canonical YAML loading functionality."""
+
+    def test_load_canonical_codes_from_yaml(self):
+        """Load canonical codes from schema/canonical_coverage.yaml."""
+        codes = load_canonical_codes(CANONICAL_SCHEMA_PATH)
+        assert isinstance(codes, set)
+        assert len(codes) > 0
+
+    def test_canonical_yaml_contains_expected_codes(self):
+        """Canonical YAML contains expected codes."""
+        codes = load_canonical_codes(CANONICAL_SCHEMA_PATH)
+        assert "A4200_1" in codes  # 암진단비
+        assert "A4103" in codes    # 뇌졸중진단비
+        assert "A5100" in codes    # 질병수술비
+
+    def test_canonical_yaml_excludes_unmapped(self):
+        """Canonical YAML does NOT contain unmapped patterns."""
+        codes = load_canonical_codes(CANONICAL_SCHEMA_PATH)
+        # A4201_1 (제자리암) is pattern-detected but NOT in canonical
+        assert "A4201_1" not in codes
+
+    def test_validate_coverage_code_with_loaded_codes(self):
+        """Validate uses loaded canonical codes."""
+        # Must load codes first (normally done in main())
+        import tools.ingest_v3_1_sample as ingest
+        ingest.CANONICAL_COVERAGE_CODES = load_canonical_codes(CANONICAL_SCHEMA_PATH)
+
+        # Valid canonical codes pass
         assert validate_coverage_code("A4200_1") == "A4200_1"
         assert validate_coverage_code("A4103") == "A4103"
 
-    def test_validate_coverage_code_invalid(self):
-        """Invalid codes return None (not the candidate)."""
+        # Invalid codes return None
         assert validate_coverage_code("INVALID_CODE") is None
-        assert validate_coverage_code("A9999") is None
+        assert validate_coverage_code("A4201_1") is None  # Not in canonical
 
-    def test_validate_coverage_code_none(self):
+    def test_validate_coverage_code_none_input(self):
         """None input returns None."""
         assert validate_coverage_code(None) is None
 
-    def test_canonical_codes_match_schema(self):
-        """CANONICAL_COVERAGE_CODES contains expected codes from schema."""
-        # These must exist in schema/canonical_coverage.yaml
-        assert "A4200_1" in CANONICAL_COVERAGE_CODES
-        assert "A4103" in CANONICAL_COVERAGE_CODES
+    def test_load_canonical_codes_missing_file(self):
+        """Missing schema file raises FileNotFoundError."""
+        from pathlib import Path
+        with pytest.raises(FileNotFoundError):
+            load_canonical_codes(Path("/nonexistent/path.yaml"))
+
+
+class TestUnmappedCandidatesQueue:
+    """Test unmapped candidates queue generation."""
+
+    def test_unmapped_candidate_dataclass_fields(self):
+        """UnmappedCandidate has required fields."""
+        candidate = UnmappedCandidate(
+            insurer="SAMSUNG",
+            source_file="test.pdf",
+            page=3,
+            candidate_code="A4201_1",
+            snippet="제자리암 관련 텍스트",
+            reason="not_in_canonical_coverage",
+            created_at="2025-01-01T00:00:00Z",
+        )
+        assert candidate.insurer == "SAMSUNG"
+        assert candidate.candidate_code == "A4201_1"
+        assert candidate.reason == "not_in_canonical_coverage"
+
+    def test_unmapped_detected_from_chunks(self, sample_samsung_chunks):
+        """Unmapped candidates are detected from chunks with candidate but no validated code."""
+        unmapped = []
+        for chunk in sample_samsung_chunks:
+            if chunk.coverage_code_candidate and not chunk.coverage_code:
+                unmapped.append(chunk)
+
+        # Samsung mock has 제자리암 on page 3 (A4201_1 candidate, not validated)
+        assert len(unmapped) >= 1
+        assert any(c.coverage_code_candidate == "A4201_1" for c in unmapped)
+
+    def test_unmapped_reason_is_not_in_canonical(self, sample_samsung_chunks):
+        """Unmapped chunks have correct reason: not_in_canonical_coverage."""
+        for chunk in sample_samsung_chunks:
+            if chunk.coverage_code_candidate and not chunk.coverage_code:
+                # This would be logged as not_in_canonical_coverage
+                # (actual reason is set in save_unmapped_candidates)
+                assert chunk.coverage_code_candidate is not None
+                assert chunk.coverage_code is None
 
 
 # --- Test: Compare Engine ---

@@ -26,7 +26,7 @@ echo ""
 
 # Check for --demo flag
 DEMO_FLAG=""
-if [[ "$1" == "--demo" ]]; then
+if [[ "${1:-}" == "--demo" ]]; then
     DEMO_FLAG="--demo"
     echo "(Running in DEMO mode with mock data)"
     echo ""
