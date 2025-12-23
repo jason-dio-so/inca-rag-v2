@@ -42,3 +42,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# V3-1 local PDFs (must never be committed)
+data/v3_1_sample/**/*.pdf
+
+# Artifacts (generated files)
+artifacts/
