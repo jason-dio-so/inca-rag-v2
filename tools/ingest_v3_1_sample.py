@@ -112,6 +112,10 @@ class ChunkMeta:
     created_at: str
 
 
+# Global flag for demo mode (use mock data instead of real PDFs)
+DEMO_MODE = False
+
+
 def extract_pdf_text(pdf_path: Path) -> list[tuple[int, str]]:
     """
     Extract text from PDF, page by page.
@@ -119,6 +123,10 @@ def extract_pdf_text(pdf_path: Path) -> list[tuple[int, str]]:
     Returns list of (page_number, text) tuples.
     Page numbers are 1-indexed.
     """
+    # Demo mode: use mock data without requiring actual PDFs
+    if DEMO_MODE:
+        return _mock_pdf_extraction(pdf_path)
+
     if not pdf_path.exists():
         print(f"WARNING: PDF not found: {pdf_path}")
         return []
@@ -280,6 +288,13 @@ def save_chunks(chunks: list[ChunkMeta], output_path: Path) -> None:
 
 def main():
     """Main ingestion entry point."""
+    global DEMO_MODE
+
+    # Check for --demo flag
+    if "--demo" in sys.argv:
+        DEMO_MODE = True
+        print("DEMO MODE: Using mock PDF data")
+
     print("=" * 50)
     print("  V3-1 Sample Ingestion")
     print("=" * 50)
@@ -295,6 +310,7 @@ def main():
 
     if not all_chunks:
         print("\nERROR: No chunks created. Check if PDF files exist.")
+        print("TIP: Use --demo flag to run with mock data")
         return 1
 
     # Save to JSONL

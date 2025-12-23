@@ -24,19 +24,30 @@ echo ""
 echo "Query: 삼성화재와 메리츠화재의 암진단비를 비교해줘"
 echo ""
 
+# Check for --demo flag
+DEMO_FLAG=""
+if [[ "$1" == "--demo" ]]; then
+    DEMO_FLAG="--demo"
+    echo "(Running in DEMO mode with mock data)"
+    echo ""
+fi
+
 # --- Step 1: Ingest ---
 echo "[1/4] Ingesting 약관 PDFs..."
-python tools/ingest_v3_1_sample.py
+python tools/ingest_v3_1_sample.py $DEMO_FLAG
 echo ""
 
 # --- Step 2: Run Compare Engine ---
 echo "[2/4] Running V2 Compare Engine..."
 python -c "
 import sys
+import json
+import re
+from pathlib import Path
 sys.path.insert(0, '.')
 
-from compare.types import Insurer
-from compare.evidence_types import Evidence, EvidencePurpose, EvidenceSlot
+from compare.types import Insurer, DocType
+from compare.evidence_types import EvidencePurpose, EvidenceSlot, EvidenceSlots, RetrievalPass
 from compare.evidence_binder import EvidenceBinder
 from compare.decision_types import CompareDecision
 
@@ -44,9 +55,6 @@ from compare.decision_types import CompareDecision
 COVERAGE_CODE = 'A4200_1'
 
 # Load chunks from ingestion
-import json
-from pathlib import Path
-
 chunks_file = Path('artifacts/v3_1_chunks.jsonl')
 chunks = []
 if chunks_file.exists():
@@ -66,70 +74,96 @@ for chunk in chunks:
 
 print(f'  Insurers: {list(by_insurer.keys())}')
 
-# Create evidence from chunks (simulate retrieval)
+# Extract amount from text
+def extract_amount(text):
+    match = re.search(r'(\d+천만원|\d+만원)', text)
+    return match.group(1) if match else None
+
+# Process each insurer
+binder = EvidenceBinder()
 results = {}
+
 for insurer, insurer_chunks in by_insurer.items():
-    evidence_list = []
+    # Filter chunks with matching coverage_code
+    matching = [c for c in insurer_chunks if c.get('coverage_code') == COVERAGE_CODE]
 
-    for chunk in insurer_chunks:
-        # Only use chunks with matching coverage_code
-        if chunk.get('coverage_code') != COVERAGE_CODE:
-            continue
-
-        # Determine evidence purpose from text
-        text = chunk.get('text', '')
-        purpose = EvidencePurpose.DEFINITION
-
-        # Simple heuristics for purpose detection
-        if any(kw in text for kw in ['만원', '원을', '지급']):
-            purpose = EvidencePurpose.AMOUNT
-        elif any(kw in text for kw in ['조건', '경과', '이후']):
-            purpose = EvidencePurpose.CONDITION
-
-        evidence = Evidence(
-            evidence_id=chunk['chunk_id'],
-            coverage_code=COVERAGE_CODE,
-            insurer=Insurer(insurer),
-            source_doc=chunk['source_file'],
-            doc_type=chunk['doc_type'],
-            page=chunk['page_start'],
-            excerpt=text[:500] if len(text) > 500 else text,
-            purpose=purpose,
-            retrieval_pass=1,
-            confidence_score=0.9,
-        )
-        evidence_list.append(evidence)
-
-    # Bind evidence to result
-    binder = EvidenceBinder()
-    if evidence_list:
-        binding_result = binder.bind(evidence_list, COVERAGE_CODE, Insurer(insurer))
-        results[insurer] = binding_result
-        print(f'  {insurer}: {binding_result.decision.value}')
-    else:
+    if not matching:
         print(f'  {insurer}: No matching evidence')
+        continue
+
+    # Build EvidenceSlots from chunks
+    amount_slot = None
+    condition_slot = None
+    definition_slot = None
+
+    for chunk in matching:
+        text = chunk.get('text', '')
+        page = chunk['page_start']
+        source = chunk['source_file']
+
+        # Extract amount if present
+        amount = extract_amount(text)
+        if amount and not amount_slot:
+            amount_slot = EvidenceSlot(
+                purpose=EvidencePurpose.AMOUNT,
+                source_doc=DocType.YAKGWAN,
+                excerpt=text[:200],
+                value=amount,
+                page=page,
+                doc_id=chunk['chunk_id'],
+                retrieval_pass=RetrievalPass.PASS_1,
+            )
+
+        # Check for condition
+        if any(kw in text for kw in ['조건', '경과', '이후', '90일']) and not condition_slot:
+            condition_slot = EvidenceSlot(
+                purpose=EvidencePurpose.CONDITION,
+                source_doc=DocType.YAKGWAN,
+                excerpt=text[:200],
+                page=page,
+                doc_id=chunk['chunk_id'],
+                retrieval_pass=RetrievalPass.PASS_2,
+            )
+
+    # Create slots and bind
+    slots = EvidenceSlots(
+        amount=amount_slot,
+        condition=condition_slot,
+        definition=definition_slot,
+    )
+
+    result = binder.bind(slots)
+    results[insurer] = result
+    print(f'  {insurer}: {result.decision.value}')
 
 # Save intermediate result
-import json
 output_path = Path('artifacts/v3_1_compare_result.json')
 output_path.parent.mkdir(parents=True, exist_ok=True)
 
-# Convert to serializable format
 serializable = {}
 for ins, res in results.items():
+    # Get bound evidence details
+    amount_info = None
+    condition_info = None
+    for be in res.bound_evidence:
+        if be.slot_type == 'amount':
+            amount_info = {
+                'value': res.amount_value,
+                'source_doc': be.doc_id,
+                'page': be.page,
+                'excerpt': be.excerpt,
+            }
+        elif be.slot_type == 'condition':
+            condition_info = {
+                'excerpt': be.excerpt,
+                'source_doc': be.doc_id,
+            }
+
     serializable[ins] = {
         'decision': res.decision.value,
-        'coverage_code': res.coverage_code,
-        'amount_slot': {
-            'value': res.amount_slot.value if res.amount_slot else None,
-            'source_doc': res.amount_slot.source_doc if res.amount_slot else None,
-            'page': res.amount_slot.page if res.amount_slot else None,
-            'excerpt': res.amount_slot.excerpt if res.amount_slot else None,
-        } if res.amount_slot else None,
-        'condition_slot': {
-            'excerpt': res.condition_slot.excerpt if res.condition_slot else None,
-            'source_doc': res.condition_slot.source_doc if res.condition_slot else None,
-        } if res.condition_slot else None,
+        'amount_value': res.amount_value,
+        'amount_slot': amount_info,
+        'condition_slot': condition_info,
     }
 
 with open(output_path, 'w', encoding='utf-8') as f:
@@ -142,15 +176,9 @@ echo ""
 echo "[3/4] Generating Explain View..."
 python -c "
 import sys
-sys.path.insert(0, '.')
-
 import json
 from pathlib import Path
-from compare.explain_view_mapper import ExplainViewMapper
-from compare.evidence_binder import BindingResult
-from compare.decision_types import CompareDecision
-from compare.evidence_types import Evidence, EvidenceSlot, EvidencePurpose
-from compare.types import Insurer
+sys.path.insert(0, '.')
 
 # Load compare result
 compare_result_path = Path('artifacts/v3_1_compare_result.json')
@@ -161,84 +189,49 @@ if not compare_result_path.exists():
 with open(compare_result_path, 'r', encoding='utf-8') as f:
     compare_data = json.load(f)
 
-# Build ExplainView for each insurer
-mapper = ExplainViewMapper()
+# Build simplified ExplainView for each insurer (without using V2 mapper)
 insurer_views = []
 
 for insurer, data in compare_data.items():
-    # Reconstruct BindingResult
-    amount_slot = None
-    if data.get('amount_slot') and data['amount_slot'].get('value'):
-        amount_slot = EvidenceSlot(
-            slot_type=EvidencePurpose.AMOUNT,
-            value=data['amount_slot']['value'],
-            source_doc=data['amount_slot'].get('source_doc', ''),
-            page=data['amount_slot'].get('page'),
-            excerpt=data['amount_slot'].get('excerpt', ''),
-        )
+    decision = data.get('decision', 'unknown')
 
-    condition_slot = None
-    if data.get('condition_slot') and data['condition_slot'].get('excerpt'):
-        condition_slot = EvidenceSlot(
-            slot_type=EvidencePurpose.CONDITION,
-            value=None,
-            source_doc=data['condition_slot'].get('source_doc', ''),
-            page=None,
-            excerpt=data['condition_slot'].get('excerpt', ''),
-        )
+    # Build evidence tabs from saved data
+    amount_tab = []
+    if data.get('amount_slot'):
+        amount_tab.append({
+            'value': data['amount_slot'].get('value') or data.get('amount_value'),
+            'source_doc': data['amount_slot'].get('source_doc', '약관'),
+            'page': data['amount_slot'].get('page'),
+            'excerpt': data['amount_slot'].get('excerpt', ''),
+        })
 
-    binding_result = BindingResult(
-        coverage_code=data['coverage_code'],
-        insurer=Insurer(insurer),
-        decision=CompareDecision(data['decision']),
-        amount_slot=amount_slot,
-        condition_slot=condition_slot,
-        definition_slot=None,
-        applied_rules=[],
-        explanation=None,
-    )
+    condition_tab = []
+    if data.get('condition_slot'):
+        condition_tab.append({
+            'source_doc': data['condition_slot'].get('source_doc', '약관'),
+            'excerpt': data['condition_slot'].get('excerpt', ''),
+        })
 
-    # Map to ExplainView
-    explain_view = mapper.map(binding_result)
+    # Determine card type from decision
+    card_type = 'info' if decision == 'determined' else 'error'
+    title = '비교 완료' if decision == 'determined' else '근거 부족'
+
     insurer_views.append({
         'insurer': insurer,
         'explain_view': {
-            'decision': explain_view.decision,
+            'decision': decision,
             'reason_card': {
-                'card_type': explain_view.reason_card.card_type.value,
-                'title': explain_view.reason_card.title,
-                'description': explain_view.reason_card.description,
+                'card_type': card_type,
+                'title': title,
             },
             'evidence_tabs': {
-                'amount': [
-                    {
-                        'value': e.value,
-                        'source_doc': e.source_doc,
-                        'page': e.page,
-                        'excerpt': e.excerpt,
-                    }
-                    for e in explain_view.evidence_tabs.amount
-                ],
-                'condition': [
-                    {
-                        'source_doc': e.source_doc,
-                        'page': e.page,
-                        'excerpt': e.excerpt,
-                    }
-                    for e in explain_view.evidence_tabs.condition
-                ],
-                'definition': [
-                    {
-                        'source_doc': e.source_doc,
-                        'excerpt': e.excerpt,
-                    }
-                    for e in explain_view.evidence_tabs.definition
-                ],
+                'amount': amount_tab,
+                'condition': condition_tab,
+                'definition': [],
             },
-            'rule_trace': explain_view.rule_trace,
         }
     })
-    print(f'  {insurer}: {explain_view.reason_card.card_type.value} - {explain_view.reason_card.title}')
+    print(f'  {insurer}: {decision}')
 
 # Build multi-insurer view
 multi_view = {
